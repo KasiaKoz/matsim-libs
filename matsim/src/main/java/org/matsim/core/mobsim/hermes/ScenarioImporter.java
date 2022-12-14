@@ -35,6 +35,7 @@ import org.matsim.core.mobsim.hermes.Agent.PlanArray;
 import org.matsim.core.population.routes.GenericRouteImpl;
 import org.matsim.core.population.routes.NetworkRoute;
 import org.matsim.core.router.TripStructureUtils;
+import org.matsim.core.router.util.TravelTime;
 import org.matsim.core.utils.collections.ArrayMap;
 import org.matsim.core.utils.collections.IntArrayMap;
 import org.matsim.core.utils.misc.OptionalTime;
@@ -60,6 +61,7 @@ class ScenarioImporter {
 	private final Scenario scenario;
 
 	private final Map<Id<VehicleType>, Integer> vehicleTypeMapping = new HashMap<>();
+	private final Map<String, TravelTime> travelTimes;
 	protected int agentPersons;
 	// hermes route numbers for each line/route. Should be used as follows:
 	// route_numbers.get(line id).get(route id) -> hermes-route-number
@@ -92,9 +94,10 @@ class ScenarioImporter {
 	private final int numberOfThreads;
 	private final List<List<Event>> deterministicPtEvents;
 
-	private ScenarioImporter(Scenario scenario, EventsManager eventsManager) {
+	private ScenarioImporter(Scenario scenario, EventsManager eventsManager, Map<String, TravelTime> travelTimes) {
 		numberOfThreads = Math.min(scenario.getConfig().global().getNumberOfThreads(), Runtime.getRuntime().availableProcessors());
 		this.deterministicPt = scenario.getConfig().hermes().isDeterministicPt();
+		this.travelTimes = travelTimes;
 		if (deterministicPt) {
 			deterministicPtEvents = new ArrayList<>(scenario.getConfig().hermes().getEndTime());
 			for (int i = 0; i < scenario.getConfig().hermes().getEndTime(); i++) {
@@ -135,11 +138,11 @@ class ScenarioImporter {
 		instance = null;
 	}
 
-	public static ScenarioImporter instance(Scenario scenario, EventsManager eventsManager) {
+	public static ScenarioImporter instance(Scenario scenario, EventsManager eventsManager, Map<String, TravelTime> travelTimes) {
 		// if instance is null or the scenario changed or events manager changed, re-do everything.
 		if (instance == null || !scenario.equals(instance.scenario) || !eventsManager.equals(instance.eventsManager)) {
 			log.info("Hermes rebuilding scenario!");
-			instance = new ScenarioImporter(scenario, eventsManager);
+			instance = new ScenarioImporter(scenario, eventsManager, travelTimes);
 		}
 		return instance;
 	}

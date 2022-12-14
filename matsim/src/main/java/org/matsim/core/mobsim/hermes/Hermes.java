@@ -18,6 +18,7 @@
  * *********************************************************************** */
 package org.matsim.core.mobsim.hermes;
 
+import com.google.inject.Inject;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.matsim.api.core.v01.Id;
@@ -26,6 +27,9 @@ import org.matsim.api.core.v01.events.PersonStuckEvent;
 import org.matsim.api.core.v01.population.Person;
 import org.matsim.core.api.experimental.events.EventsManager;
 import org.matsim.core.mobsim.framework.Mobsim;
+import org.matsim.core.router.util.TravelTime;
+
+import java.util.Map;
 
 final class Hermes implements Mobsim {
 
@@ -35,14 +39,20 @@ final class Hermes implements Mobsim {
 	private ScenarioImporter scenarioImporter;
 	private final Scenario scenario;
 	private final EventsManager eventsManager;
+	@Inject
+	Map<String, TravelTime> travelTimes;
 
 	public Hermes(Scenario scenario, EventsManager eventsManager) {
 		this.scenario = scenario;
 		this.eventsManager = eventsManager;
 	}
 
+	public void addTravelTimes() {
+
+	}
+
 	private void importScenario() throws Exception {
-		scenarioImporter = ScenarioImporter.instance(scenario, eventsManager);
+		scenarioImporter = ScenarioImporter.instance(scenario, eventsManager, travelTimes);
 		scenarioImporter.generate();
 		this.realm = scenarioImporter.realm;
 		this.agents = scenarioImporter.hermesAgents;

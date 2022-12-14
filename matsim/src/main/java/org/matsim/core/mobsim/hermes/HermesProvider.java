@@ -24,16 +24,22 @@ import org.matsim.core.mobsim.framework.Mobsim;
 
 import com.google.inject.Inject;
 import com.google.inject.Provider;
+import org.matsim.core.router.util.TravelTime;
+
+import java.util.Map;
 
 public final class HermesProvider implements Provider<Mobsim> {
 
 	private final Scenario scenario;
-    private final EventsManager eventsManager;
+	private final EventsManager eventsManager;
+	@Inject
+	Map<String, TravelTime> travelTimes;
 
     @Inject
-	public HermesProvider(Scenario scenario, EventsManager eventsManager) {
+	public HermesProvider(Scenario scenario, EventsManager eventsManager, Map<String, TravelTime> travelTimes) {
         this.scenario = scenario;
         this.eventsManager = eventsManager;
+	    this.travelTimes = travelTimes;
     }
 
 	@Override
