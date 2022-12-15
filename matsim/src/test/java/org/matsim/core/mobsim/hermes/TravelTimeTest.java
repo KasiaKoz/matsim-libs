@@ -19,11 +19,14 @@
 
 package org.matsim.core.mobsim.hermes;
 
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
 import org.junit.Assert;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TemporaryFolder;
 import org.matsim.api.core.v01.Id;
 import org.matsim.api.core.v01.Scenario;
 import org.matsim.api.core.v01.events.LinkEnterEvent;
@@ -31,20 +34,29 @@ import org.matsim.api.core.v01.events.LinkLeaveEvent;
 import org.matsim.api.core.v01.events.handler.LinkEnterEventHandler;
 import org.matsim.api.core.v01.events.handler.LinkLeaveEventHandler;
 import org.matsim.api.core.v01.network.Link;
+import org.matsim.api.core.v01.population.Person;
 import org.matsim.core.api.experimental.events.EventsManager;
 import org.matsim.core.config.Config;
 import org.matsim.core.config.ConfigUtils;
+import org.matsim.core.controler.AbstractModule;
+import org.matsim.core.controler.Controler;
 import org.matsim.core.controler.PrepareForSimUtils;
+import org.matsim.core.events.MatsimEventsReader;
 import org.matsim.core.events.ParallelEventsManager;
 import org.matsim.core.gbl.MatsimRandom;
+import org.matsim.core.router.util.TravelTime;
 import org.matsim.core.scenario.ScenarioUtils;
 import org.matsim.testcases.MatsimTestUtils;
 import org.matsim.vehicles.Vehicle;
+
+import javax.inject.Singleton;
 
 /**
  * @author dgrether
  */
 public class TravelTimeTest {
+	@Rule
+	public TemporaryFolder tmpDir = new TemporaryFolder();
 
 	@Test
 	public void testEquilOneAgent() {
@@ -75,6 +87,46 @@ public class TravelTimeTest {
 		Assert.assertEquals(358.0, travelTimes.get(Id.create(21, Link.class)).intValue(), MatsimTestUtils.EPSILON);
 		Assert.assertEquals(1251.0, travelTimes.get(Id.create(22, Link.class)).intValue(), MatsimTestUtils.EPSILON);
 		Assert.assertEquals(358.0, travelTimes.get(Id.create(23, Link.class)).intValue(), MatsimTestUtils.EPSILON);
+	}
+
+	@Test
+	public void testBindingCustomTravelTime() throws IOException {
+		Config config = ConfigUtils.loadConfig("test/scenarios/equil/config.xml");
+		MatsimRandom.reset(config.global().getRandomSeed());
+		Scenario scenario = ScenarioUtils.createScenario(config);
+
+		String popFileName = "plans1.xml";
+		config.plans().setInputFile(popFileName);
+		String outputDir = String.valueOf(tmpDir.newFolder("outputDir"));
+		config.controler().setOutputDirectory(outputDir);
+		config.controler().setMobsim("hermes");
+
+		ScenarioUtils.loadScenario(scenario);
+		Controler controler = new Controler(scenario);
+		controler.addOverridingModule(new CustomTravelTimeModule());
+		controler.run();
+
+//		PrepareForSimUtils.createDefaultPrepareForSim(scenario).run();
+//		new HermesBuilder() //
+//			.build(scenario, events) //
+//			.run();
+
+		Map<Id<Vehicle>, Map<Id<Link>, Double>> agentTravelTimes = new HashMap<>();
+		EventsManager events = new ParallelEventsManager(false);
+		events.addHandler(new EventTestHandler(agentTravelTimes));
+		events.initProcessing();
+		MatsimEventsReader reader = new MatsimEventsReader(events);
+		reader.readFile(outputDir + "/output_events.xml.gz");
+		events.finishProcessing();
+
+		Map<Id<Link>, Double> travelTimes = agentTravelTimes.get(Id.create("1", Vehicle.class));
+		Assert.assertEquals(0.0, travelTimes.get(Id.create(6, Link.class)).intValue(), MatsimTestUtils.EPSILON);
+		Assert.assertEquals(0.0, travelTimes.get(Id.create(15, Link.class)).intValue(), MatsimTestUtils.EPSILON);
+		// this one is NOT a travel time (it includes two activities and a zero-length trip)
+		Assert.assertEquals(0.0, travelTimes.get(Id.create(20, Link.class)).intValue(), MatsimTestUtils.EPSILON);
+		Assert.assertEquals(0.0, travelTimes.get(Id.create(21, Link.class)).intValue(), MatsimTestUtils.EPSILON);
+		Assert.assertEquals(0.0, travelTimes.get(Id.create(22, Link.class)).intValue(), MatsimTestUtils.EPSILON);
+		Assert.assertEquals(0.0, travelTimes.get(Id.create(23, Link.class)).intValue(), MatsimTestUtils.EPSILON);
 	}
 
 	@Test
@@ -246,6 +298,22 @@ public class TravelTimeTest {
 
 		@Override
 		public void reset(int iteration) {
+		}
+	}
+
+	public static class CustomTravelTimeModule extends AbstractModule {
+
+		@Override
+		public void install() {
+			addTravelTimeBinding("car").to(CustomTravelTime.class).in(Singleton.class);
+		}
+	}
+
+	public static class CustomTravelTime implements TravelTime {
+
+		@Override
+		public double getLinkTravelTime(Link link, double time, Person person, Vehicle vehicle) {
+			return 0;
 		}
 	}
 
