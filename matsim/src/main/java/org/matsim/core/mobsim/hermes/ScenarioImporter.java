@@ -35,6 +35,7 @@ import org.matsim.core.mobsim.hermes.Agent.PlanArray;
 import org.matsim.core.population.routes.GenericRouteImpl;
 import org.matsim.core.population.routes.NetworkRoute;
 import org.matsim.core.router.TripStructureUtils;
+import org.matsim.core.router.util.TravelTime;
 import org.matsim.core.utils.collections.ArrayMap;
 import org.matsim.core.utils.collections.IntArrayMap;
 import org.matsim.core.utils.misc.OptionalTime;
@@ -89,10 +90,11 @@ class ScenarioImporter {
 	// Note: in order to make MATSim Agent ids, some positions in the array might be null.
 	protected Agent[] hermesAgents;
 	protected final EventsManager eventsManager;
+	private Map<String, TravelTime> travelTimes;
 	private final int numberOfThreads;
 	private final List<List<Event>> deterministicPtEvents;
 
-	private ScenarioImporter(Scenario scenario, EventsManager eventsManager) {
+	private ScenarioImporter(Scenario scenario, EventsManager eventsManager, Map<String, TravelTime> travelTimes) {
 		numberOfThreads = Math.min(scenario.getConfig().global().getNumberOfThreads(), Runtime.getRuntime().availableProcessors());
 		this.deterministicPt = scenario.getConfig().hermes().isDeterministicPt();
 		if (deterministicPt) {
@@ -105,6 +107,7 @@ class ScenarioImporter {
 		}
 		this.scenario = scenario;
 		this.eventsManager = eventsManager;
+		this.travelTimes = travelTimes;
 		generateVehicleCategories();
 		generateLinks();
 		generatePT();
@@ -135,11 +138,11 @@ class ScenarioImporter {
 		instance = null;
 	}
 
-	public static ScenarioImporter instance(Scenario scenario, EventsManager eventsManager) {
+	public static ScenarioImporter instance(Scenario scenario, EventsManager eventsManager, Map<String, TravelTime> travelTimes) {
 		// if instance is null or the scenario changed or events manager changed, re-do everything.
 		if (instance == null || !scenario.equals(instance.scenario) || !eventsManager.equals(instance.eventsManager)) {
 			log.info("Hermes rebuilding scenario!");
-			instance = new ScenarioImporter(scenario, eventsManager);
+			instance = new ScenarioImporter(scenario, eventsManager, travelTimes);
 		}
 		return instance;
 	}
@@ -372,8 +375,6 @@ class ScenarioImporter {
 		Id<VehicleType> vtypeid = v == null ? VehicleUtils.getDefaultVehicleType().getId() : v.getType().getId();
 		int pcuCategory = this.vehicleTypeMapping.get(vtypeid);
 		Id<Vehicle> vid = v == null ? Id.createVehicleId("v" + person.getId()) : v.getId();
-		double velocity = v == null ?
-				HermesConfigGroup.MAX_VEHICLE_VELOCITY : v.getType().getMaximumVelocity();
 		int egressId = endLId.index();
 
 		//initial capacity setting
@@ -388,14 +389,17 @@ class ScenarioImporter {
 		if (netroute.getLinkIds().size() > 1 || !startLId.equals(endLId)) {
 			events.add(new LinkLeaveEvent(0, vid, startLId));
 		}
+		Map<Id<Link>, ? extends Link> matsimLinks = scenario.getNetwork().getLinks();
 		for (Id<org.matsim.api.core.v01.network.Link> linkid : netroute.getLinkIds()) {
 			int linkId = linkid.index();
 			events.add(new LinkEnterEvent(0, vid, linkid));
+			double velocity = travelTimes.get(v.getType().getNetworkMode()).getLinkTravelTime(matsimLinks.get(linkid), (double) 0, person, v);
 			flatplan.add(Agent.prepareLinkEntry(events.size() - 1, linkId, velocity, pcuCategory));
 			events.add(new LinkLeaveEvent(0, vid, linkid));
 		}
 		if (netroute.getLinkIds().size() > 1 || !startLId.equals(endLId)) {
 			events.add(new LinkEnterEvent(0, vid, endLId));
+			double velocity = travelTimes.get(v.getType().getNetworkMode()).getLinkTravelTime(matsimLinks.get(endLId), (double) 0, person, v);
 			flatplan.add(Agent.prepareLinkEntry(events.size() - 1, egressId, velocity, pcuCategory));
 		}
 		events.add(new VehicleLeavesTrafficEvent(0, id, endLId, vid, leg.getMode(), 1));
