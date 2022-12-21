@@ -316,7 +316,7 @@ public class TravelTimeTest {
 
 		@Override
 		public double getLinkTravelTime(Link link, double time, Person person, Vehicle vehicle) {
-			return 1.0;
+			return link.getLength() / 1.0;
 		}
 	}
 
