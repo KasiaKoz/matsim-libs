@@ -393,13 +393,15 @@ class ScenarioImporter {
 		for (Id<org.matsim.api.core.v01.network.Link> linkid : netroute.getLinkIds()) {
 			int linkId = linkid.index();
 			events.add(new LinkEnterEvent(0, vid, linkid));
-			double velocity = travelTimes.get(v.getType().getNetworkMode()).getLinkTravelTime(matsimLinks.get(linkid), (double) 0, person, v);
+			Link matsimLink = matsimLinks.get(linkid);
+			double velocity = 1 / (travelTimes.get(v.getType().getNetworkMode()).getLinkTravelTime(matsimLink, (double) 0, person, v) / matsimLink.getLength());
 			flatplan.add(Agent.prepareLinkEntry(events.size() - 1, linkId, velocity, pcuCategory));
 			events.add(new LinkLeaveEvent(0, vid, linkid));
 		}
 		if (netroute.getLinkIds().size() > 1 || !startLId.equals(endLId)) {
 			events.add(new LinkEnterEvent(0, vid, endLId));
-			double velocity = travelTimes.get(v.getType().getNetworkMode()).getLinkTravelTime(matsimLinks.get(endLId), (double) 0, person, v);
+			Link matsimLink = matsimLinks.get(endLId);
+			double velocity = 1 / (travelTimes.get(v.getType().getNetworkMode()).getLinkTravelTime(matsimLink, (double) 0, person, v) / matsimLink.getLength());
 			flatplan.add(Agent.prepareLinkEntry(events.size() - 1, egressId, velocity, pcuCategory));
 		}
 		events.add(new VehicleLeavesTrafficEvent(0, id, endLId, vid, leg.getMode(), 1));
