@@ -22,7 +22,6 @@ package org.matsim.core.mobsim.hermes;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 import org.junit.Assert;
@@ -47,7 +46,6 @@ import org.matsim.core.events.MatsimEventsReader;
 import org.matsim.core.events.ParallelEventsManager;
 import org.matsim.core.gbl.MatsimRandom;
 import org.matsim.core.mobsim.framework.Mobsim;
-import org.matsim.core.mobsim.qsim.AbstractQSimModule;
 import org.matsim.core.router.util.TravelTime;
 import org.matsim.core.scenario.ScenarioUtils;
 import org.matsim.testcases.MatsimTestUtils;
@@ -316,39 +314,26 @@ public class TravelTimeTest {
 
 		@Override
 		public double getLinkTravelTime(Link link, double time, Person person, Vehicle vehicle) {
-			return link.getLength() / 1.0;
-		}
-	}
-
-	public static class CustomQSimModule extends AbstractQSimModule {
-		static final public String COMPONENT_NAME = "Custom";
-
-		private final Map<String, TravelTime> customTravelTimes;
-
-		public CustomQSimModule(Map<String, TravelTime> customTravelTimes) {
-			this.customTravelTimes = customTravelTimes;
-		}
-
-		@Override
-		protected void configureQSim() {
-//			addNamedComponent(MultiModalSimEngine.class, COMPONENT_NAME);
-//			addNamedComponent(MultiModalDepartureHandler.class, COMPONENT_NAME);
+			return link.getLength();
 		}
 	}
 
 	public static class CustomHermesProvider implements Provider<Mobsim> {
 		private Scenario scenario;
 		private EventsManager eventsManager;
-		private Map<String, TravelTime> customTravelTimes;
+		private Map<String, TravelTime> travelTimes;
 
 		@Inject
-		CustomHermesProvider(Scenario scenario, EventsManager eventsManager) {
+		CustomHermesProvider(Scenario scenario, EventsManager eventsManager, Map<String, TravelTime> travelTimes) {
 			this.scenario = scenario;
 			this.eventsManager = eventsManager;
+			this.travelTimes = travelTimes;
 		}
 		@Override
 		public Mobsim get() {
-			return new HermesBuilder().addTravelTime("car", new CustomTravelTime()).build(scenario, eventsManager);
+			return new HermesBuilder()
+				.addTravelTime("car", this.travelTimes.get("car"))
+				.build(scenario, eventsManager);
 		}
 	}
 
