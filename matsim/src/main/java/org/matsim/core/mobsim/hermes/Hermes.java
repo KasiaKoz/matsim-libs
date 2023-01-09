@@ -65,14 +65,14 @@ final class Hermes implements Mobsim {
 	}
 
 	private void processEvents() {
-        eventsManager.processEvents(realm.getSortedEvents());
+		eventsManager.processEvents(realm.getSortedEvents());
 
 		for (Agent agent : agents) {
 			if (agent != null && !agent.finished() && !agent.isTransitVehicle()) {
 				int matsim_id = scenarioImporter.matsim_id(agent.id(), false);
 				eventsManager.processEvent(
-						new PersonStuckEvent(
-								HermesConfigGroup.SIM_STEPS, Id.get(matsim_id, Person.class), Id.createLinkId("0"), "zero"));
+					new PersonStuckEvent(
+						HermesConfigGroup.SIM_STEPS, Id.get(matsim_id, Person.class), Id.createLinkId("0"), "zero"));
 			}
 		}
 	}
@@ -90,7 +90,7 @@ final class Hermes implements Mobsim {
 			time = System.currentTimeMillis();
 			realm.run();
 			log.info(String.format(
-					"Hermes took %d ms", System.currentTimeMillis() - time));
+				"Hermes took %d ms", System.currentTimeMillis() - time));
 
 			time = System.currentTimeMillis();
 			processEvents();
@@ -107,7 +107,7 @@ final class Hermes implements Mobsim {
 	public static class DefaultTravelTime implements TravelTime {
 		@Override
 		public double getLinkTravelTime(Link link, double time, Person person, Vehicle vehicle) {
-			return link.getLength()/vehicle.getType().getMaximumVelocity();
+			return link.getLength() / vehicle.getType().getMaximumVelocity();
 		}
 	}
 }
