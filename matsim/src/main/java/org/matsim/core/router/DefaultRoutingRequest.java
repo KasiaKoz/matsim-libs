@@ -56,4 +56,14 @@ public class DefaultRoutingRequest implements RoutingRequest {
 			Person person) {
 		return new DefaultRoutingRequest(fromFacility, toFacility, departureTime, person, new AttributesImpl());
 	}
+
+	public final String toString() {
+		StringBuilder b = new StringBuilder();
+		b.append("[person=").append(this.getPerson()).append("]");
+		b.append("[from_facility_at_link=").append(this.getFromFacility().getLinkId()).append("]");
+		b.append("[from_facility_at_coord=").append(this.getFromFacility().getCoord()).append("]");
+		b.append("[to_facility_at_link=").append(this.getToFacility().getLinkId()).append("]");
+		b.append("[to_facility_at_coord=").append(this.getToFacility().getCoord()).append("]");
+		return b.toString();
+	}
 }
