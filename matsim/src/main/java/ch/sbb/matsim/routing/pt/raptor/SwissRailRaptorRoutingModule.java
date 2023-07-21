@@ -56,19 +56,18 @@ public class SwissRailRaptorRoutingModule implements RoutingModule {
     @Override
     public List<? extends PlanElement> calcRoute(RoutingRequest request) {
         List<? extends PlanElement> legs = this.raptor.calcRoute(request);
-		try {
-			fillWithActivities(legs);
+		if (legs != null) {
+			try {
+				return fillWithActivities(legs);
+			} catch (NullPointerException nullPointerException) {
+				System.out.printf("Hello, here is a problem person: %s", request.getPerson());
+				System.out.printf("Hello, here is a problem plan request: %s", request);
+				throw nullPointerException;
+			}
+		} else {
+			return walkRouter.calcRoute(request);
 		}
-		catch (NullPointerException nullPointerException) {
-			System.out.printf("Hello, here is a problem person: %s",  request.getPerson());
-			System.out.printf("Hello, here is a problem plan request: %s",  request);
-			throw nullPointerException;
-		}
-
-        return legs != null ?
-                fillWithActivities(legs) :
-                walkRouter.calcRoute(request);
-    }
+	}
 
     private List<? extends PlanElement> fillWithActivities(List<? extends PlanElement> segments) {
         List<PlanElement> planElements = new ArrayList<>(segments.size() * 2);
