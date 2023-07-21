@@ -56,6 +56,15 @@ public class SwissRailRaptorRoutingModule implements RoutingModule {
     @Override
     public List<? extends PlanElement> calcRoute(RoutingRequest request) {
         List<? extends PlanElement> legs = this.raptor.calcRoute(request);
+		try {
+			fillWithActivities(legs);
+		}
+		catch (NullPointerException nullPointerException) {
+			System.out.printf("Hello, here is a problem person: %s",  request.getPerson());
+			System.out.printf("Hello, here is a problem plan request: %s",  request);
+			throw nullPointerException;
+		}
+
         return legs != null ?
                 fillWithActivities(legs) :
                 walkRouter.calcRoute(request);
@@ -70,7 +79,15 @@ public class SwissRailRaptorRoutingModule implements RoutingModule {
 				// otherwise we maintain interaction activities from
 				// access and egress trips
 				if (prevLeg instanceof Leg && pe instanceof Leg) {
-					Coord coord = findCoordinate((Leg)prevLeg, (Leg)pe);
+					Coord coord = null;
+					try {
+						coord = findCoordinate((Leg)prevLeg, (Leg)pe);
+					}
+					catch (NullPointerException nullPointerException) {
+						System.out.printf("Hello, here is a problem plan element: %s",  pe);
+						throw nullPointerException;
+					}
+
                 	Id<Link> linkId = ((Leg)pe).getRoute().getStartLinkId();
                 	Activity act = PopulationUtils.createStageActivityFromCoordLinkIdAndModePrefix(coord, linkId, TransportMode.pt);
                 	planElements.add(act);
@@ -93,7 +110,19 @@ public class SwissRailRaptorRoutingModule implements RoutingModule {
         }
         // fallback: prevLeg and nextLeg are not pt routes, so we have to guess the coordinate based on the link id
         Id<Link> linkId = prevLeg.getRoute().getEndLinkId();
+
         Link link = this.network.getLinks().get(linkId);
+		if (link == null) {
+			System.out.printf("Hello, here is a problem link ID: %s",  linkId);
+			System.out.printf("Hello, here is a problem previous leg mode: %s",  prevLeg.getMode());
+			System.out.printf("Hello, here is a problem previous leg routing mode: %s",  prevLeg.getRoutingMode());
+			System.out.printf("Hello, here is a problem previous leg's route description: %s",  prevLeg.getRoute().getRouteDescription());
+			System.out.printf("Hello, here is a problem previous leg's route: %s",  prevLeg.getRoute());
+			System.out.printf("Hello, here is a problem next leg mode: %s",  nextLeg.getMode());
+			System.out.printf("Hello, here is a problem next leg routing mode: %s",  nextLeg.getRoutingMode());
+			System.out.printf("Hello, here is a problem next leg's route description: %s",  nextLeg.getRoute().getRouteDescription());
+			System.out.printf("Hello, here is a problem next leg's route: %s",  nextLeg.getRoute());
+		}
         return link.getToNode().getCoord();
     }
 
