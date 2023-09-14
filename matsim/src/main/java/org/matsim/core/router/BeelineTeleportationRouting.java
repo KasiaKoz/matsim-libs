@@ -22,17 +22,16 @@
  package org.matsim.core.router;
 
 import org.matsim.api.core.v01.Scenario;
-import org.matsim.api.core.v01.population.PopulationFactory;
 import org.matsim.core.config.groups.PlansCalcRouteConfigGroup;
 
-import javax.inject.Inject;
-import javax.inject.Provider;
+import jakarta.inject.Inject;
+import jakarta.inject.Provider;
 
 class BeelineTeleportationRouting implements Provider<RoutingModule> {
 
-	private final PlansCalcRouteConfigGroup.ModeRoutingParams params;
+	private final PlansCalcRouteConfigGroup.TeleportedModeParams params;
 
-	public BeelineTeleportationRouting(PlansCalcRouteConfigGroup.ModeRoutingParams params) {
+	public BeelineTeleportationRouting( PlansCalcRouteConfigGroup.TeleportedModeParams params ) {
 		this.params = params;
 	}
 

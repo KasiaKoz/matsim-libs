@@ -1,12 +1,12 @@
 /*******************************************************************************
  * Copyright (c) 2011 Stefan Schroeder.
  * eMail: stefan.schroeder@kit.edu
- *
+ * <p>
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the GNU Public License v2.0
  * which accompanies this distribution, and is available at
  * http://www.gnu.org/licenses/old-licenses/gpl-2.0.html
- *
+ * <p>
  * Contributors:
  *     Stefan Schroeder - initial API and implementation
  ******************************************************************************/
@@ -48,7 +48,7 @@ import org.matsim.contrib.freight.carrier.TimeWindow;
 import org.matsim.contrib.freight.carrier.*;
 import org.matsim.contrib.freight.carrier.Tour.Leg;
 import org.matsim.contrib.freight.carrier.Tour.TourElement;
-import org.matsim.contrib.freight.utils.FreightUtils;
+import org.matsim.contrib.freight.controler.FreightUtils;
 import org.matsim.core.utils.io.IOUtils;
 import org.matsim.vehicles.VehicleType;
 import org.matsim.vehicles.VehicleUtils;
@@ -60,7 +60,7 @@ import java.util.List;
 
 /**
  * A factory that creates matsim-object from jsprit
- * (https://github.com/jsprit/jsprit) and vice versa.
+ * (<a href="https://github.com/jsprit/jsprit">...</a>) and vice versa.
  *
  * @author sschroeder
  *         <p>
@@ -69,53 +69,30 @@ import java.util.List;
  */
 public final class MatsimJspritFactory {
 
+	@SuppressWarnings("unused")
 	private static final  Logger log = LogManager.getLogger(MatsimJspritFactory.class);
 
-	// How to deal with a multi-depot VRP? Which depotLink should be used? kmt
-	// jul/18
-
-	/**
-	 * Creates (MATSim) CarrierShipment from a (jsprit) service
-	 *
-	 * @param service   to be transformed to Shipment
-	 * @param depotLink as from-link for Shipment
-	 * @return CarrierShipment
-	 * @see CarrierShipment, Service
-	 */
-	static CarrierShipment createCarrierShipmentFromService(Service service, String depotLink) {
-		CarrierShipment carrierShipment = CarrierShipment.Builder
-				.newInstance(Id.create(service.getId(), CarrierShipment.class), Id.create(depotLink, Link.class),
-						Id.create(service.getLocation().getId(), Link.class), service.getSize().get(0))
-				.setDeliveryServiceTime(service.getServiceDuration())
-				.setDeliveryTimeWindow(
-						TimeWindow.newInstance(service.getTimeWindow().getStart(), service.getTimeWindow().getEnd()))
-				.build();
-		for (String skill : service.getRequiredSkills().values()) {
-			FreightUtils.addSkill(carrierShipment, skill);
-		}
-		return carrierShipment;
-	}
 
 	/**
 	 * Creates (MATSim) {@link CarrierShipment} from a (jsprit) {@link Shipment}
 	 *
-	 * @param shipment to be transformed to MATSim
+	 * @param jspritShipment to be transformed to MATSim
 	 * @return CarrierShipment
 	 * @see CarrierShipment, Shipment
 	 */
-	static CarrierShipment createCarrierShipment(Shipment shipment) {
+	static CarrierShipment createCarrierShipment(Shipment jspritShipment) {
 		CarrierShipment carrierShipment = CarrierShipment.Builder
-				.newInstance(Id.create(shipment.getId(), CarrierShipment.class),
-						Id.createLinkId(shipment.getPickupLocation().getId()),
-						Id.createLinkId(shipment.getDeliveryLocation().getId()), shipment.getSize().get(0))
-				.setDeliveryServiceTime(shipment.getDeliveryServiceTime())
-				.setDeliveryTimeWindow(TimeWindow.newInstance(shipment.getDeliveryTimeWindow().getStart(),
-						shipment.getDeliveryTimeWindow().getEnd()))
-				.setPickupServiceTime(shipment.getPickupServiceTime())
-				.setPickupTimeWindow(TimeWindow.newInstance(shipment.getPickupTimeWindow().getStart(),
-						shipment.getPickupTimeWindow().getEnd()))
+				.newInstance(Id.create(jspritShipment.getId(), CarrierShipment.class),
+						Id.createLinkId(jspritShipment.getPickupLocation().getId()),
+						Id.createLinkId(jspritShipment.getDeliveryLocation().getId()), jspritShipment.getSize().get(0))
+				.setDeliveryServiceTime(jspritShipment.getDeliveryServiceTime())
+				.setDeliveryTimeWindow(TimeWindow.newInstance(jspritShipment.getDeliveryTimeWindow().getStart(),
+						jspritShipment.getDeliveryTimeWindow().getEnd()))
+				.setPickupServiceTime(jspritShipment.getPickupServiceTime())
+				.setPickupTimeWindow(TimeWindow.newInstance(jspritShipment.getPickupTimeWindow().getStart(),
+						jspritShipment.getPickupTimeWindow().getEnd()))
 				.build();
-		FreightUtils.setSkills(carrierShipment, shipment.getRequiredSkills().values());
+		FreightUtils.setSkills(carrierShipment, jspritShipment.getRequiredSkills().values());
 		return carrierShipment;
 	}
 
@@ -126,7 +103,7 @@ public final class MatsimJspritFactory {
 	 * @return Shipment
 	 * @see CarrierShipment, Shipment
 	 */
-	static Shipment createShipment(CarrierShipment carrierShipment) {
+	static Shipment createJspritShipment(CarrierShipment carrierShipment) {
 		Shipment.Builder shipmentBuilder = Shipment.Builder.newInstance(carrierShipment.getId().toString())
 				.setDeliveryLocation(Location.newInstance(carrierShipment.getTo().toString()))
 				.setDeliveryServiceTime(carrierShipment.getDeliveryServiceTime())
@@ -145,7 +122,7 @@ public final class MatsimJspritFactory {
 		return shipmentBuilder.build();
 	}
 
-	static Shipment createShipment(CarrierShipment carrierShipment, Coord fromCoord, Coord toCoord) {
+	static Shipment createJspritShipment(CarrierShipment carrierShipment, Coord fromCoord, Coord toCoord) {
 		Location.Builder fromLocationBuilder = Location.Builder.newInstance();
 		fromLocationBuilder.setId(carrierShipment.getFrom().toString());
 		if (fromCoord != null) {
@@ -176,7 +153,7 @@ public final class MatsimJspritFactory {
 		return shipmentBuilder.build();
 	}
 
-	static Service createService(CarrierService carrierService, Coord locationCoord) {
+	static Service createJspritService(CarrierService carrierService, Coord locationCoord) {
 		Location.Builder locationBuilder = Location.Builder.newInstance();
 		locationBuilder.setId(carrierService.getLocationLinkId().toString());
 		if (locationCoord != null) {
@@ -196,15 +173,20 @@ public final class MatsimJspritFactory {
 		return serviceBuilder.build();
 	}
 
-	static CarrierService createCarrierService(Service service) {
+	/**
+	 * Creates a (MATSim) {@link CarrierService} from a (jsprit) Service
+	 * @param jspritService service from jsprit
+	 * @return CarrierService
+	 */
+	static CarrierService createCarrierService(Service jspritService) {
 		CarrierService.Builder serviceBuilder = CarrierService.Builder.newInstance(
-				Id.create(service.getId(), CarrierService.class), Id.create(service.getLocation().getId(), Link.class));
-		serviceBuilder.setCapacityDemand(service.getSize().get(0));
-		serviceBuilder.setServiceDuration(service.getServiceDuration());
+				Id.create(jspritService.getId(), CarrierService.class), Id.create(jspritService.getLocation().getId(), Link.class));
+		serviceBuilder.setCapacityDemand(jspritService.getSize().get(0));
+		serviceBuilder.setServiceDuration(jspritService.getServiceDuration());
 		serviceBuilder.setServiceStartTimeWindow(
-				TimeWindow.newInstance(service.getTimeWindow().getStart(), service.getTimeWindow().getEnd()));
+				TimeWindow.newInstance(jspritService.getTimeWindow().getStart(), jspritService.getTimeWindow().getEnd()));
 		CarrierService carrierService = serviceBuilder.build();
-		FreightUtils.setSkills(carrierService, service.getRequiredSkills().values());
+		FreightUtils.setSkills(carrierService, jspritService.getRequiredSkills().values());
 		return carrierService;
 	}
 
@@ -216,14 +198,14 @@ public final class MatsimJspritFactory {
 	 * @return jsprit vehicle
 	 * @see Vehicle, CarrierVehicle
 	 */
-	static com.graphhopper.jsprit.core.problem.vehicle.Vehicle createVehicle(org.matsim.contrib.freight.carrier.CarrierVehicle carrierVehicle, Coord locationCoord) {
+	static com.graphhopper.jsprit.core.problem.vehicle.Vehicle createJspritVehicle(CarrierVehicle carrierVehicle, Coord locationCoord) {
 		Location.Builder vehicleLocationBuilder = Location.Builder.newInstance();
 		vehicleLocationBuilder.setId(carrierVehicle.getLinkId().toString() );
 		if (locationCoord != null) {
 			vehicleLocationBuilder.setCoordinate(Coordinate.newInstance(locationCoord.getX(), locationCoord.getY()));
 		}
 		Location vehicleLocation = vehicleLocationBuilder.build();
-		com.graphhopper.jsprit.core.problem.vehicle.VehicleType vehicleType = createVehicleType(
+		com.graphhopper.jsprit.core.problem.vehicle.VehicleType vehicleType = createJspritVehicleType(
 				carrierVehicle.getType());
 		VehicleImpl.Builder vehicleBuilder = VehicleImpl.Builder.newInstance(carrierVehicle.getId().toString());
 		vehicleBuilder.setEarliestStart(carrierVehicle.getEarliestStartTime())
@@ -251,14 +233,14 @@ public final class MatsimJspritFactory {
 	 * @return carrierVehicle
 	 * @see CarrierVehicle, Vehicle
 	 */
-	static org.matsim.contrib.freight.carrier.CarrierVehicle createCarrierVehicle(com.graphhopper.jsprit.core.problem.vehicle.Vehicle jspritVehicle) {
+	static CarrierVehicle createCarrierVehicle(com.graphhopper.jsprit.core.problem.vehicle.Vehicle jspritVehicle) {
 		VehicleType matsimVehicleType;
 		if (jspritVehicle.getType().getUserData() != null){
 			log.info("Use the (MATSim) vehicleType that was stored inside the (jsprit) vehicleType during the jsprit run but never interacted with jsprit. ");
 			matsimVehicleType = (VehicleType) jspritVehicle.getType().getUserData(); //Read in store MATSimVehicleType... Attention: This will not take care for any changes during the jsprit run
 		} else {
 			log.info("There was no (MATSim) vehicleType stored inside the (jsprit) vehicleType. -> create one from the available data of the (jsprit) vehicle type");
-			matsimVehicleType = createCarrierVehicleType(jspritVehicle.getType());
+			matsimVehicleType = createMatsimVehicleType(jspritVehicle.getType());
 		}
 		// yyyy
 
@@ -287,7 +269,7 @@ public final class MatsimJspritFactory {
 	}
 
 	/**
-	 * Creates a MATSim {@link VehicleType} from a jspirt
+	 * Creates a MATSim {@link VehicleType} from a jsprit
 	 * {@link com.graphhopper.jsprit.core.problem.vehicle.VehicleType}.
 	 *
 	 * <p>
@@ -295,9 +277,9 @@ public final class MatsimJspritFactory {
 	 * setEngineInformation(engineInfo) from the returned object.
 	 *
 	 * @param jspritVehType to be transformed
-	 * @return CarrierVehicleType
+	 * @return MatsimVehicleType
 	 */
-	static VehicleType createCarrierVehicleType(com.graphhopper.jsprit.core.problem.vehicle.VehicleType jspritVehType) {
+	static VehicleType createMatsimVehicleType(com.graphhopper.jsprit.core.problem.vehicle.VehicleType jspritVehType) {
 		VehicleType matsimVehicleType = VehicleUtils.getFactory().createVehicleType(Id.create(jspritVehType.getTypeId(), VehicleType.class));
 		matsimVehicleType.getCapacity().setWeightInTons(jspritVehType.getCapacityDimensions().get(0));
 		matsimVehicleType.getCostInformation().setCostsPerMeter(jspritVehType.getVehicleCostParams().perDistanceUnit);
@@ -312,8 +294,10 @@ public final class MatsimJspritFactory {
 	/**
 	 * Creates a jsprit {@link com.graphhopper.jsprit.core.problem.vehicle.VehicleType} from a MATSin
 	 * {@link VehicleType}.
+	 * @param matsimVehicleType The (MATSim) {@link VehicleType} that should be converted
+	 * @return {@link com.graphhopper.jsprit.core.problem.vehicle.VehicleType} The jsprit VehicleType
 	 */
-	static com.graphhopper.jsprit.core.problem.vehicle.VehicleType createVehicleType(VehicleType matsimVehicleType) {
+	static com.graphhopper.jsprit.core.problem.vehicle.VehicleType createJspritVehicleType(VehicleType matsimVehicleType) {
 		if (matsimVehicleType == null)
 			throw new IllegalStateException("carrierVehicleType is null");
 		VehicleTypeImpl.Builder jspritVehTypeBuilder = VehicleTypeImpl.Builder
@@ -342,13 +326,13 @@ public final class MatsimJspritFactory {
 		if (VehicleUtils.getCostsPerSecondInService(matsimVehicleType.getCostInformation()) != null) {
 			jspritVehTypeBuilder.setCostPerServiceTime(VehicleUtils.getCostsPerSecondInService(matsimVehicleType.getCostInformation()));
 		} else {
-			log.info("Costs per service time is not set in VehicleType attributes. Will use the value of costsPerMeter instead. VehicleTypeId: " + matsimVehicleType.getId());
+			log.info("'costsPerSecondInService' is not set in VehicleType attributes. Will use the value of 'costsPerSecond' instead. VehicleTypeId: " + matsimVehicleType.getId());
 			jspritVehTypeBuilder.setCostPerServiceTime(matsimVehicleType.getCostInformation().getCostsPerSecond());
 		}
 		if (VehicleUtils.getCostsPerSecondWaiting(matsimVehicleType.getCostInformation()) != null) {
 			jspritVehTypeBuilder.setCostPerWaitingTime(VehicleUtils.getCostsPerSecondWaiting(matsimVehicleType.getCostInformation()));
 		} else {
-			log.info("Costs per waiting time is not set in VehicleType attributes. Will use the value of costsPerMeter instead. VehicleTypeId: " + matsimVehicleType.getId());
+			log.info("'costsPerSecondWaiting' is not set in VehicleType attributes. Will use the value of 'costsPerSecond' instead. VehicleTypeId: " + matsimVehicleType.getId());
 			jspritVehTypeBuilder.setCostPerWaitingTime(matsimVehicleType.getCostInformation().getCostsPerSecond());
 		}
 		jspritVehTypeBuilder.setFixedCost(matsimVehicleType.getCostInformation().getFixedCosts());
@@ -367,7 +351,7 @@ public final class MatsimJspritFactory {
 	 * @return ScheduledTour
 	 * @throws IllegalStateException if tourActivity is NOT {@link ServiceActivity}.
 	 */
-	static ScheduledTour createTour(VehicleRoute jspritRoute, Id<Tour> tourId) {
+	static ScheduledTour createScheduledTour(VehicleRoute jspritRoute, Id<Tour> tourId) {
 		// have made this non-public for the time being since it is nowhere used within the freight contrib, and we might want to add the
 		// vehicle types as argument.  If this is publicly used, please move back to public.  kai, jan'22
 
@@ -409,7 +393,7 @@ public final class MatsimJspritFactory {
 		matsimFreightTourBuilder.scheduleEnd(Id.create(jspritRoute.getEnd().getLocation().getId(), Link.class));
 		org.matsim.contrib.freight.carrier.Tour matsimVehicleTour = matsimFreightTourBuilder.build();
 		ScheduledTour sTour = ScheduledTour.newInstance(matsimVehicleTour, carrierVehicle, depTime);
-    
+
 		if (jspritRoute.getDepartureTime() != sTour.getDeparture())
 			throw new AssertionError("departureTime of both route and scheduledTour must be equal");
 
@@ -431,7 +415,13 @@ public final class MatsimJspritFactory {
 		double depTime = scheduledTour.getDeparture();
 		Tour tour = scheduledTour.getTour();
 		Id<org.matsim.vehicles.Vehicle> vehicleId = carrierVehicle.getId();
-		Vehicle jspritVehicle = getVehicle(vehicleId.toString(), vehicleRoutingProblem);
+		Vehicle jspritVehicle = null;
+		for (Vehicle vehicle : vehicleRoutingProblem.getVehicles()) {
+			if (vehicle.getId().equals(vehicleId.toString())) {
+				jspritVehicle = vehicle;
+				break;
+			}
+		}
 		if (jspritVehicle == null)
 			throw new IllegalStateException("jsprit-vehicle to id=" + vehicleId + " is missing");
 
@@ -464,19 +454,11 @@ public final class MatsimJspritFactory {
 		return jspritRoute;
 	}
 
-	private static Vehicle getVehicle(String id, VehicleRoutingProblem vehicleRoutingProblem) {
-		for (Vehicle vehicle : vehicleRoutingProblem.getVehicles()) {
-			if (vehicle.getId().equals(id))
-				return vehicle;
-		}
-		return null;
-	}
-
 	/**
 	 * Creates an immutable {@link VehicleRoutingProblem} from {@link Carrier}.
 	 *
 	 * <p>
-	 * For creation it takes only the information needed to setup the problem (not
+	 * For creation, it takes only the information needed to set up the problem (not
 	 * the solution, i.e. predefined plans are ignored).
 	 * <p>
 	 * The network is required to retrieve coordinates of locations.
@@ -490,8 +472,13 @@ public final class MatsimJspritFactory {
 	public static VehicleRoutingProblem createRoutingProblem(Carrier carrier, Network network,
 			VehicleRoutingTransportCosts transportCosts, VehicleRoutingActivityCosts activityCosts) {
 		VehicleRoutingProblem.Builder vrpBuilder = VehicleRoutingProblem.Builder.newInstance();
-		boolean serviceInVrp = false;
-		boolean shipmentInVrp = false;
+		boolean serviceInVrp = !carrier.getServices().isEmpty();
+		boolean shipmentInVrp = !carrier.getShipments().isEmpty();
+
+		if (shipmentInVrp && serviceInVrp) {
+			throw new UnsupportedOperationException(
+					"VRP with mixed Services and Shipments may lead to invalid solutions because of vehicle capacity handling are different");
+		}
 
 		FleetSize fleetSize;
 		CarrierCapabilities carrierCapabilities = carrier.getCarrierCapabilities();
@@ -513,7 +500,7 @@ public final class MatsimJspritFactory {
 				coordinate = link.getCoord();
 			} else
 				log.warn("cannot find linkId " + carrierVehicle.getId());
-			Vehicle veh = createVehicle(carrierVehicle, coordinate);
+			Vehicle veh = createJspritVehicle(carrierVehicle, coordinate);
 
 			if (veh.getEarliestDeparture() != carrierVehicle.getEarliestStartTime())
 				throw new AssertionError("earliestDeparture of both vehicles must be equal");
@@ -523,47 +510,43 @@ public final class MatsimJspritFactory {
 			vrpBuilder.addVehicle(veh);
 		}
 
-		for (CarrierService service : carrier.getServices().values()) {
-			if (shipmentInVrp) {
-				throw new UnsupportedOperationException(
-						"VRP with mixed Services and Shipments may lead to invalid solutions because of vehicle capacity handling are different");
+
+		if (serviceInVrp) {
+			for (CarrierService service : carrier.getServices().values()) {
+
+				Coord coordinate = null;
+				if (network != null) {
+					Link link = network.getLinks().get(service.getLocationLinkId());
+					if (link != null) {
+						coordinate = link.getCoord();
+					} else
+						log.warn("cannot find linkId " + service.getLocationLinkId());
+				}
+				vrpBuilder.addJob(createJspritService(service, coordinate));
 			}
-			Coord coordinate = null;
-			if (network != null) {
-				Link link = network.getLinks().get(service.getLocationLinkId());
-				if (link != null) {
-					coordinate = link.getCoord();
-				} else
-					log.warn("cannot find linkId " + service.getLocationLinkId());
-			}
-			serviceInVrp = true;
-			vrpBuilder.addJob(createService(service, coordinate));
 		}
 
-		for (CarrierShipment carrierShipment : carrier.getShipments().values()) {
-			if (serviceInVrp) {
-				throw new UnsupportedOperationException(
-						"VRP with mixed Services and Shipments may lead to invalid solutions because of vehicle capacity handling are different");
-			}
-			Coord fromCoordinate = null;
-			Coord toCoordinate = null;
-			if (network != null) {
-				Link fromLink = network.getLinks().get(carrierShipment.getFrom());
-				Link toLink = network.getLinks().get(carrierShipment.getTo());
+		if (shipmentInVrp) {
+			for (CarrierShipment carrierShipment : carrier.getShipments().values()) {
+				Coord fromCoordinate = null;
+				Coord toCoordinate = null;
+				if (network != null) {
+					Link fromLink = network.getLinks().get(carrierShipment.getFrom());
+					Link toLink = network.getLinks().get(carrierShipment.getTo());
 
-				if (fromLink != null && toLink != null) { // Shipment to be delivered from specified location to
-															// specified location
-					fromCoordinate = fromLink.getCoord();
-					toCoordinate = toLink.getCoord();
-					vrpBuilder.addJob(createShipment(carrierShipment, fromCoordinate, toCoordinate));
-				} else
-					throw new IllegalStateException(
-							"cannot create shipment since neither fromLinkId " + carrierShipment.getTo()
-									+ " nor toLinkId " + carrierShipment.getTo() + " exists in network.");
+					if (fromLink != null && toLink != null) { // Shipment to be delivered from specified location to
+						// specified location
+						fromCoordinate = fromLink.getCoord();
+						toCoordinate = toLink.getCoord();
+						vrpBuilder.addJob(createJspritShipment(carrierShipment, fromCoordinate, toCoordinate));
+					} else
+						throw new IllegalStateException(
+								"cannot create shipment since neither fromLinkId " + carrierShipment.getTo()
+										+ " nor toLinkId " + carrierShipment.getTo() + " exists in network.");
 
+				}
+				vrpBuilder.addJob(createJspritShipment(carrierShipment, fromCoordinate, toCoordinate));
 			}
-			shipmentInVrp = true;
-			vrpBuilder.addJob(createShipment(carrierShipment, fromCoordinate, toCoordinate));
 		}
 
 		if (transportCosts != null)
@@ -580,7 +563,7 @@ public final class MatsimJspritFactory {
 	 * from network and carrier such as {@link NetworkBasedTransportCosts}.
 	 *
 	 * <p>
-	 * For creation it takes only the information needed to setup the problem (not
+	 * For creation, it takes only the information needed to set up the problem (not
 	 * the solution, i.e. predefined plans are ignored).
 	 * <p>
 	 * The network is required to retrieve coordinates of locations.
@@ -593,8 +576,13 @@ public final class MatsimJspritFactory {
 	 */
 	public static VehicleRoutingProblem.Builder createRoutingProblemBuilder(Carrier carrier, Network network) {
 		VehicleRoutingProblem.Builder vrpBuilder = VehicleRoutingProblem.Builder.newInstance();
-		boolean serviceInVrp = false;
-		boolean shipmentInVrp = false;
+		boolean serviceInVrp = !carrier.getServices().isEmpty();
+		boolean shipmentInVrp = !carrier.getShipments().isEmpty();
+
+		if (shipmentInVrp && serviceInVrp) {
+			throw new UnsupportedOperationException(
+					"VRP with mixed Services and Shipments may lead to invalid solutions because of vehicle capacity handling are different");
+		}
 
 		FleetSize fleetSize;
 		CarrierCapabilities carrierCapabilities = carrier.getCarrierCapabilities();
@@ -616,54 +604,47 @@ public final class MatsimJspritFactory {
 				coordinate = link.getCoord();
 			} else
 				log.warn("cannot find linkId " + carrierVehicle.getId());
-			vrpBuilder.addVehicle(createVehicle(carrierVehicle, coordinate));
+			vrpBuilder.addVehicle(createJspritVehicle(carrierVehicle, coordinate));
 		}
 
-		for (CarrierService service : carrier.getServices().values()) {
-			log.debug("Handle CarrierService: " + service.toString());
-			if (shipmentInVrp) {
-				throw new UnsupportedOperationException(
-						"VRP with mixed Services and Shipments may lead to invalid solutions because of vehicle capacity handling are different");
+		if (serviceInVrp) {
+			for (CarrierService service : carrier.getServices().values()) {
+				log.debug("Handle CarrierService: " + service.toString());
+				Coord coordinate = null;
+				if (network != null) {
+					Link link = network.getLinks().get(service.getLocationLinkId());
+					if (link == null) {
+						throw new IllegalStateException("cannot create service since linkId " + service.getLocationLinkId()
+								+ " does not exists in network.");
+					} else
+						coordinate = link.getCoord();
+				}
+				vrpBuilder.addJob(createJspritService(service, coordinate));
 			}
-			Coord coordinate = null;
-			if (network != null) {
-				Link link = network.getLinks().get(service.getLocationLinkId());
-				if (link == null) {
-					throw new IllegalStateException("cannot create service since linkId " + service.getLocationLinkId()
-							+ " does not exists in network.");
-				} else
-					coordinate = link.getCoord();
-			}
-			serviceInVrp = true;
-			vrpBuilder.addJob(createService(service, coordinate));
 		}
 
-		for (CarrierShipment carrierShipment : carrier.getShipments().values()) {
-			log.debug("Handle CarrierShipment: " + carrierShipment.toString());
-			if (serviceInVrp) {
-				throw new UnsupportedOperationException(
-						"VRP with mixed Services and Shipments may lead to invalid solutions because of vehicle capacity handling are different");
+		if (shipmentInVrp) {
+			for (CarrierShipment carrierShipment : carrier.getShipments().values()) {
+				log.debug("Handle CarrierShipment: " + carrierShipment.toString());
+				Coord fromCoordinate = null;
+				Coord toCoordinate = null;
+				if (network != null) {
+					Link fromLink = network.getLinks().get(carrierShipment.getFrom());
+					Link toLink = network.getLinks().get(carrierShipment.getTo());
+
+					if (fromLink != null && toLink != null) { // Shipment to be delivered from specified location to
+						// specified location
+						log.debug("Shipment identified as Shipment: " + carrierShipment.getId().toString());
+						fromCoordinate = fromLink.getCoord();
+						toCoordinate = toLink.getCoord();
+					} else
+						throw new IllegalStateException("cannot create shipment " + carrierShipment.getId().toString()
+								+ " since either fromLinkId " + carrierShipment.getFrom() + " or toLinkId "
+								+ carrierShipment.getTo() + " exists in network.");
+
+				}
+				vrpBuilder.addJob(createJspritShipment(carrierShipment, fromCoordinate, toCoordinate));
 			}
-
-			Coord fromCoordinate = null;
-			Coord toCoordinate = null;
-			if (network != null) {
-				Link fromLink = network.getLinks().get(carrierShipment.getFrom());
-				Link toLink = network.getLinks().get(carrierShipment.getTo());
-
-				if (fromLink != null && toLink != null) { // Shipment to be delivered from specified location to
-															// specified location
-					log.debug("Shipment identified as Shipment: " + carrierShipment.getId().toString());
-					fromCoordinate = fromLink.getCoord();
-					toCoordinate = toLink.getCoord();
-				} else
-					throw new IllegalStateException("cannot create shipment " + carrierShipment.getId().toString()
-							+ " since either fromLinkId " + carrierShipment.getFrom() + " or toLinkId "
-							+ carrierShipment.getTo() + " exists in network.");
-
-			}
-			shipmentInVrp = true;
-			vrpBuilder.addJob(createShipment(carrierShipment, fromCoordinate, toCoordinate));
 		}
 
 		return vrpBuilder;
@@ -706,7 +687,7 @@ public final class MatsimJspritFactory {
 		} else
 			capabilityBuilder.setFleetSize(org.matsim.contrib.freight.carrier.CarrierCapabilities.FleetSize.INFINITE);
 		for (com.graphhopper.jsprit.core.problem.vehicle.VehicleType type : vrp.getTypes()) {
-			capabilityBuilder.addType(createCarrierVehicleType(type));
+			capabilityBuilder.addType(createMatsimVehicleType(type));
 		}
 		for (Vehicle vehicle : vrp.getVehicles()) {
 			capabilityBuilder.addVehicle(createCarrierVehicle(vehicle));
@@ -728,14 +709,14 @@ public final class MatsimJspritFactory {
 	 */
 	public static CarrierPlan createPlan(Carrier carrier, VehicleRoutingProblemSolution solution) {
 		Collection<ScheduledTour> tours = new ArrayList<>();
-		int tourIdindex = 1;
+		int tourIdIndex = 1;
 		for (VehicleRoute route : solution.getRoutes()) {
-			ScheduledTour scheduledTour = createTour(route, Id.create(tourIdindex, Tour.class));
-			tourIdindex++;
+			ScheduledTour scheduledTour = createScheduledTour(route, Id.create(tourIdIndex, Tour.class));
+			tourIdIndex++;
 			tours.add(scheduledTour);
 		}
 		CarrierPlan carrierPlan = new CarrierPlan(carrier, tours);
-		carrierPlan.setScore(solution.getCost() * (-1));
+		carrierPlan.setJspritScore(solution.getCost() * (-1));
 		return carrierPlan;
 	}
 
@@ -759,58 +740,45 @@ public final class MatsimJspritFactory {
 				throw new RuntimeException(e);
 			}
 			switch (freightConfig.getUseDistanceConstraintForTourPlanning()) {
-			case noDistanceConstraint:
-				algorithm = VehicleRoutingAlgorithms.readAndCreateAlgorithm(problem, vraURL);
-				break;
-			case basedOnEnergyConsumption:
-				log.info("Use the distanceConstraint based on energy consumption.");
-				StateManager stateManager = new StateManager(problem);
-
-				StateId distanceStateId = stateManager.createStateId("distance");
-
-				stateManager.addStateUpdater(new DistanceUpdater(distanceStateId, stateManager, netBasedCosts));
-
-				ConstraintManager constraintManager = new ConstraintManager(problem, stateManager);
-				constraintManager.addConstraint(
-						new DistanceConstraint(
-								FreightUtils.getCarrierVehicleTypes(scenario), netBasedCosts),
-						ConstraintManager.Priority.CRITICAL);
-
-				AlgorithmConfig algorithmConfig = new AlgorithmConfig();
-				AlgorithmConfigXmlReader xmlReader = new AlgorithmConfigXmlReader(algorithmConfig);
-				xmlReader.read(vraURL);
-				algorithm = VehicleRoutingAlgorithms.readAndCreateAlgorithm(problem, algorithmConfig, 0, null,
-						stateManager, constraintManager, true);
-				break;
-			default:
-				throw new IllegalStateException(
+				case noDistanceConstraint -> algorithm = VehicleRoutingAlgorithms.readAndCreateAlgorithm(problem, vraURL);
+				case basedOnEnergyConsumption -> {
+					log.info("Use the distanceConstraint based on energy consumption.");
+					StateManager stateManager = new StateManager(problem);
+					StateId distanceStateId = stateManager.createStateId("distance");
+					stateManager.addStateUpdater(new DistanceUpdater(distanceStateId, stateManager, netBasedCosts));
+					ConstraintManager constraintManager = new ConstraintManager(problem, stateManager);
+					constraintManager.addConstraint(
+							new DistanceConstraint(
+									FreightUtils.getCarrierVehicleTypes(scenario), netBasedCosts),
+							ConstraintManager.Priority.CRITICAL);
+					AlgorithmConfig algorithmConfig = new AlgorithmConfig();
+					AlgorithmConfigXmlReader xmlReader = new AlgorithmConfigXmlReader(algorithmConfig);
+					xmlReader.read(vraURL);
+					algorithm = VehicleRoutingAlgorithms.readAndCreateAlgorithm(problem, algorithmConfig, 0, null,
+							stateManager, constraintManager, true);
+				}
+				default -> throw new IllegalStateException(
 						"Unexpected value: " + freightConfig.getUseDistanceConstraintForTourPlanning());
 			}
 
 		} else {
 			log.info("Use a VehicleRoutingAlgorithm out of the box.");
 			switch (freightConfig.getUseDistanceConstraintForTourPlanning()) {
-			case noDistanceConstraint:
-				algorithm = new SchrimpfFactory().createAlgorithm(problem);
-				break;
-			case basedOnEnergyConsumption:
-				log.info("Use the distanceConstraint based on energy consumption.");
-				StateManager stateManager = new StateManager(problem);
-
-				StateId distanceStateId = stateManager.createStateId("distance");
-
-				stateManager.addStateUpdater(new DistanceUpdater(distanceStateId, stateManager, netBasedCosts));
-
-				ConstraintManager constraintManager = new ConstraintManager(problem, stateManager);
-				constraintManager.addConstraint(
-						new DistanceConstraint(
-								FreightUtils.getCarrierVehicleTypes(scenario), netBasedCosts),
-						ConstraintManager.Priority.CRITICAL);
-				algorithm = Jsprit.Builder.newInstance(problem)
-						.setStateAndConstraintManager(stateManager, constraintManager).buildAlgorithm();
-				break;
-			default:
-				throw new IllegalStateException(
+				case noDistanceConstraint -> algorithm = new SchrimpfFactory().createAlgorithm(problem);
+				case basedOnEnergyConsumption -> {
+					log.info("Use the distanceConstraint based on energy consumption.");
+					StateManager stateManager = new StateManager(problem);
+					StateId distanceStateId = stateManager.createStateId("distance");
+					stateManager.addStateUpdater(new DistanceUpdater(distanceStateId, stateManager, netBasedCosts));
+					ConstraintManager constraintManager = new ConstraintManager(problem, stateManager);
+					constraintManager.addConstraint(
+							new DistanceConstraint(
+									FreightUtils.getCarrierVehicleTypes(scenario), netBasedCosts),
+							ConstraintManager.Priority.CRITICAL);
+					algorithm = Jsprit.Builder.newInstance(problem)
+							.setStateAndConstraintManager(stateManager, constraintManager).buildAlgorithm();
+				}
+				default -> throw new IllegalStateException(
 						"Unexpected value: " + freightConfig.getUseDistanceConstraintForTourPlanning());
 			}
 		}

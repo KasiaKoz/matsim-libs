@@ -18,24 +18,30 @@
  * *********************************************************************** */
 package org.matsim.contrib.bicycle.run;
 
+import com.google.inject.Inject;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.matsim.api.core.v01.Id;
 import org.matsim.api.core.v01.Scenario;
 import org.matsim.api.core.v01.TransportMode;
+import org.matsim.api.core.v01.network.Link;
+import org.matsim.contrib.bicycle.AdditionalBicycleLinkScore;
 import org.matsim.contrib.bicycle.BicycleConfigGroup;
-import org.matsim.contrib.bicycle.Bicycles;
+import org.matsim.contrib.bicycle.BicycleModule;
+import org.matsim.contrib.bicycle.BicycleUtils;
 import org.matsim.core.config.Config;
 import org.matsim.core.config.ConfigUtils;
 import org.matsim.core.config.groups.PlanCalcScoreConfigGroup.ActivityParams;
 import org.matsim.core.config.groups.PlanCalcScoreConfigGroup.ModeParams;
 import org.matsim.core.config.groups.QSimConfigGroup;
 import org.matsim.core.config.groups.StrategyConfigGroup.StrategySettings;
+import org.matsim.core.controler.AbstractModule;
 import org.matsim.core.controler.Controler;
 import org.matsim.core.controler.OutputDirectoryHierarchy.OverwriteFileSetting;
 import org.matsim.core.scenario.ScenarioUtils;
 import org.matsim.vehicles.VehicleType;
 import org.matsim.vehicles.VehicleUtils;
+import org.matsim.vehicles.VehiclesFactory;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -68,20 +74,25 @@ public class RunBicycleExample {
 		config.controler().setLastIteration(100); // Modify if motorized interaction is used
 		boolean considerMotorizedInteraction = false;
 
-		new RunBicycleExample().run(config, considerMotorizedInteraction);
+		new RunBicycleExample().run(config );
 	}
 
 	static void fillConfigWithBicycleStandardValues(Config config) {
 		config.controler().setWriteEventsInterval(1);
 
-		BicycleConfigGroup bicycleConfigGroup = (BicycleConfigGroup) config.getModules().get(BicycleConfigGroup.GROUP_NAME);
+		BicycleConfigGroup bicycleConfigGroup = ConfigUtils.addOrGetModule( config, BicycleConfigGroup.class );
 		bicycleConfigGroup.setMarginalUtilityOfInfrastructure_m(-0.0002);
 		bicycleConfigGroup.setMarginalUtilityOfComfort_m(-0.0002);
 		bicycleConfigGroup.setMarginalUtilityOfGradient_m_100m(-0.02);
+		bicycleConfigGroup.setMarginalUtilityOfUserDefinedNetworkAttribute_m(-0.0000); // always needs to be negative
+		bicycleConfigGroup.setUserDefinedNetworkAttributeName("quietness"); // needs to be defined as a value from 0 to 1, 1 being best, 0 being worst
+		bicycleConfigGroup.setUserDefinedNetworkAttributeDefaultValue(0.1); // used for those links that do not have a value for the user-defined attribute
+
 		bicycleConfigGroup.setMaxBicycleSpeedForRouting(4.16666666);
 
+
 		List<String> mainModeList = new ArrayList<>();
-		mainModeList.add("bicycle");
+		mainModeList.add( bicycleConfigGroup.getBicycleMode() );
 		mainModeList.add(TransportMode.car);
 
 		config.qsim().setMainModes(mainModeList);
@@ -98,32 +109,79 @@ public class RunBicycleExample {
 		config.plansCalcRoute().setNetworkModes(mainModeList);
 	}
 
-	public void run(Config config, boolean considerMotorizedInteraction) {
+	public void run(Config config ) {
+		config.global().setNumberOfThreads(1);
+		config.controler().setOverwriteFileSetting(OverwriteFileSetting.deleteDirectoryIfExists);
+
+		config.plansCalcRoute().setRoutingRandomness(3.);
+
+		BicycleConfigGroup bicycleConfigGroup = ConfigUtils.addOrGetModule( config, BicycleConfigGroup.class );
+
+		final String bicycle = bicycleConfigGroup.getBicycleMode();
+
+		Scenario scenario = ScenarioUtils.loadScenario(config);
+
+		// set config such that the mode vehicles come from vehicles data:
+		scenario.getConfig().qsim().setVehiclesSource(QSimConfigGroup.VehiclesSource.modeVehicleTypesFromVehiclesData);
+
+		// now put hte mode vehicles into the vehicles data:
+		final VehiclesFactory vf = VehicleUtils.getFactory();
+		scenario.getVehicles().addVehicleType( vf.createVehicleType(Id.create(TransportMode.car, VehicleType.class ) ) );
+		scenario.getVehicles().addVehicleType( vf.createVehicleType(Id.create( bicycle, VehicleType.class ) )
+							 .setNetworkMode( bicycle ).setMaximumVelocity(4.16666666 ).setPcuEquivalents(0.25 ) );
+
+		Controler controler = new Controler(scenario);
+		controler.addOverridingModule(new BicycleModule() );
+
+		controler.run();
+	}
+	public void runWithOwnScoring(Config config, boolean considerMotorizedInteraction) {
 		config.global().setNumberOfThreads(1);
 		config.controler().setOverwriteFileSetting(OverwriteFileSetting.deleteDirectoryIfExists);
 
 		config.plansCalcRoute().setRoutingRandomness(3.);
 
 		if (considerMotorizedInteraction) {
-			BicycleConfigGroup bicycleConfigGroup = (BicycleConfigGroup) config.getModules().get(BicycleConfigGroup.GROUP_NAME);
+			BicycleConfigGroup bicycleConfigGroup = ConfigUtils.addOrGetModule( config, BicycleConfigGroup.class );
 			bicycleConfigGroup.setMotorizedInteraction(considerMotorizedInteraction);
 		}
 
 		Scenario scenario = ScenarioUtils.loadScenario(config);
 
-		VehicleType car = VehicleUtils.getFactory().createVehicleType(Id.create(TransportMode.car, VehicleType.class));
-		scenario.getVehicles().addVehicleType(car);
-
-		VehicleType bicycle = VehicleUtils.getFactory().createVehicleType(Id.create("bicycle", VehicleType.class));
-		bicycle.setMaximumVelocity(4.16666666); // 15km/h
-		bicycle.setPcuEquivalents(0.25);
-		scenario.getVehicles().addVehicleType(bicycle);
-
+		// set config such that the mode vehicles come from vehicles data:
 		scenario.getConfig().qsim().setVehiclesSource(QSimConfigGroup.VehiclesSource.modeVehicleTypesFromVehiclesData);
 
+		// now put hte mode vehicles into the vehicles data:
+		final VehiclesFactory vf = VehicleUtils.getFactory();
+		scenario.getVehicles().addVehicleType( vf.createVehicleType(Id.create(TransportMode.car, VehicleType.class ) ) );
+		scenario.getVehicles().addVehicleType( vf.createVehicleType(Id.create("bicycle", VehicleType.class ) ).setMaximumVelocity(4.16666666 ).setPcuEquivalents(0.25 ) );
+
 		Controler controler = new Controler(scenario);
-		Bicycles.addAsOverridingModule(controler);
+		controler.addOverridingModule(new BicycleModule() );
+		controler.addOverridingModule( new AbstractModule(){
+			@Override public void install(){
+				this.bind( AdditionalBicycleLinkScore.class ).to( MyAdditionalBicycleLinkScore.class );
+			}
+		} );
 
 		controler.run();
 	}
+
+	private static class MyAdditionalBicycleLinkScore implements AdditionalBicycleLinkScore {
+
+		private final AdditionalBicycleLinkScore delegate;
+		@Inject MyAdditionalBicycleLinkScore( Scenario scenario ) {
+			this.delegate = BicycleUtils.createDefaultBicycleLinkScore( scenario );
+		}
+		@Override public double computeLinkBasedScore( Link link ){
+			double result = (double) link.getAttributes().getAttribute( "carFreeStatus" );  // from zero to one
+
+			double amount = delegate.computeLinkBasedScore( link );
+
+			return amount + result ;  // or some other way to augment the score
+
+		}
+	}
+
+
 }

@@ -29,8 +29,8 @@ import org.matsim.api.core.v01.events.*;
 import org.matsim.api.core.v01.population.Person;
 import org.matsim.contrib.freight.carrier.Carrier;
 import org.matsim.contrib.freight.carrier.Carriers;
-import org.matsim.contrib.freight.events.FreightEventCreator;
-import org.matsim.contrib.freight.events.FreightEventCreatorUtils;
+import org.matsim.contrib.freight.events.CarrierEventCreator;
+import org.matsim.contrib.freight.events.CarrierEventCreatorUtils;
 import org.matsim.core.api.experimental.events.EventsManager;
 import org.matsim.core.events.algorithms.Vehicle2DriverEventHandler;
 import org.matsim.core.events.handler.BasicEventHandler;
@@ -39,7 +39,7 @@ import java.util.*;
 
 /**
  * This keeps track of all carrierAgents during simulation.
- * 
+ *
  * @author mzilske, sschroeder
  *
  */
@@ -53,6 +53,7 @@ public final class CarrierAgentTracker implements BasicEventHandler
 	// tracker was destroyed and recreated in every iteration, to something that is persistent.  Indeed, original matsim design always was like
 	// that (so that observers could collect information over multiple iterations without additional programming).  kai, jul'22
 
+	@SuppressWarnings("unused")
 	private static final Logger log = LogManager.getLogger( CarrierAgentTracker.class ) ;
 
 	private final Carriers carriers;
@@ -61,13 +62,13 @@ public final class CarrierAgentTracker implements BasicEventHandler
 	private final Vehicle2DriverEventHandler vehicle2DriverEventHandler = new Vehicle2DriverEventHandler();
 	private final List<CarrierAgent> carrierAgents = new ArrayList<>();
 	private final Map<Id<Person>, CarrierAgent> driverAgentMap = new LinkedHashMap<>();
-	private final Collection<FreightEventCreator> freightEventCreators;
+	private final Collection<CarrierEventCreator> carrierEventCreators;
 
 	@Inject CarrierAgentTracker( Carriers carriers, CarrierScoringFunctionFactory carrierScoringFunctionFactory, EventsManager events ) {
 		this.carriers = carriers;
 		this.carrierScoringFunctionFactory = carrierScoringFunctionFactory;
 		this.events = events;
-		this.freightEventCreators = FreightEventCreatorUtils.getStandardEventCreators();
+		this.carrierEventCreators = CarrierEventCreatorUtils.getStandardEventCreators();
 		this.reset(-1);
 	}
 
@@ -77,7 +78,7 @@ public final class CarrierAgentTracker implements BasicEventHandler
 		driverAgentMap.clear();
 		carrierAgents.clear();
 		for (Carrier carrier : this.carriers.getCarriers().values()) {
-			carrierAgents.add( new CarrierAgent( carrier, carrierScoringFunctionFactory.createScoringFunction( carrier ), events, freightEventCreators) );
+			carrierAgents.add( new CarrierAgent( carrier, carrierScoringFunctionFactory.createScoringFunction( carrier ), events, carrierEventCreators) );
 		}
 	}
 
@@ -87,6 +88,7 @@ public final class CarrierAgentTracker implements BasicEventHandler
 	void scoreSelectedPlans() {
 		for (Carrier carrier : carriers.getCarriers().values()) {
 			CarrierAgent agent = getCarrierAgentFromCarrier(carrier.getId() );
+			assert agent != null;
 			agent.scoreSelectedPlan();
 		}
 	}

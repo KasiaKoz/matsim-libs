@@ -27,51 +27,52 @@ import org.matsim.api.core.v01.Scenario;
 import org.matsim.core.controler.AbstractModule;
 import org.matsim.core.controler.events.StartupEvent;
 import org.matsim.core.controler.listener.StartupListener;
+import org.matsim.core.mobsim.qsim.AbstractQSimModule;
 import org.matsim.vehicles.VehicleType;
 
 /**
  * @author smetzler, dziemke
  */
-final class BicycleModule extends AbstractModule {
-	// needs to be public since otherwise nobody can overwrite parts of Bicycles.addAsOverridingModules(...).  kai, sep'19
+public final class BicycleModule extends AbstractModule {
 
 	private static final Logger LOG = LogManager.getLogger(BicycleModule.class);
 
 	@Inject
 	private BicycleConfigGroup bicycleConfigGroup;
 
-	BicycleModule() {
-	}
-
 	@Override
 	public void install() {
+		// The idea here is the following:
+		// * scores are just added as score events.  no scoring function is replaced.
+
+		// * link speeds are computed via a plugin handler to the DefaultLinkSpeedCalculator.  If the plugin handler returns a speed, it is
+		// used, otherwise the default speed is used. This has the advantage that multiple plugins can register such special link speed calculators.
 
 		addTravelTimeBinding(bicycleConfigGroup.getBicycleMode()).to(BicycleTravelTime.class).in(Singleton.class);
 		addTravelDisutilityFactoryBinding(bicycleConfigGroup.getBicycleMode()).to(BicycleTravelDisutilityFactory.class).in(Singleton.class);
 
-		// TODO: bicycle contrib can not be used with other scoring functions at the moment, as only one can be installed
-		// TODO: scoring should work via a score event so it can be used together with other scoring functions
+		this.addEventHandlerBinding().to( BicycleScoreEventsCreator.class );
+		// (the motorized interaction is in the BicycleScoreEventsCreator)
 
-		bindScoringFunctionFactory().to(BicycleScoringFunctionFactory.class).in(Singleton.class);
+		this.bind( AdditionalBicycleLinkScore.class ).to( AdditionalBicycleLinkScoreDefaultImpl.class );
 
 		bind( BicycleLinkSpeedCalculator.class ).to( BicycleLinkSpeedCalculatorDefaultImpl.class ) ;
+		// this is still needed because the bicycle travel time calculator for routing needs to use the same bicycle speed as the mobsim.  kai, jun'23
 
-		if (bicycleConfigGroup.isMotorizedInteraction()) {
-			addMobsimListenerBinding().to(MotorizedInteractionEngine.class);
-		}
+		this.installOverridingQSimModule( new AbstractQSimModule(){
+			@Override protected void configureQSim(){
+				this.addLinkSpeedCalculator().to( BicycleLinkSpeedCalculator.class );
+			}
+		} );
+
 		addControlerListenerBinding().to(ConsistencyCheck.class);
 	}
 
 	static class ConsistencyCheck implements StartupListener {
+		@Inject private BicycleConfigGroup bicycleConfigGroup;
+		@Inject private Scenario scenario;
 
-		@Inject
-		private BicycleConfigGroup bicycleConfigGroup;
-
-		@Inject
-		private Scenario scenario;
-
-		@Override
-		public void notifyStartup(StartupEvent event) {
+		@Override public void notifyStartup(StartupEvent event) {
 
 			Id<VehicleType> bicycleVehTypeId = Id.create(bicycleConfigGroup.getBicycleMode(), VehicleType.class);
 			if (scenario.getVehicles().getVehicleTypes().get(bicycleVehTypeId) == null) {

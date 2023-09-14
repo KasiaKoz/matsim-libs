@@ -65,7 +65,7 @@ import org.matsim.vehicles.Vehicle;
  * @author jfbischoff
  */
 
-public final class EvNetworkRoutingModule implements RoutingModule {
+final class EvNetworkRoutingModule implements RoutingModule {
 
 	private final String mode;
 
@@ -81,7 +81,7 @@ public final class EvNetworkRoutingModule implements RoutingModule {
 	private final String vehicleSuffix;
 	private final EvConfigGroup evConfigGroup;
 
-	public EvNetworkRoutingModule(final String mode, final Network network, RoutingModule delegate,
+	EvNetworkRoutingModule(final String mode, final Network network, RoutingModule delegate,
 			ElectricFleetSpecification electricFleet,
 			ChargingInfrastructureSpecification chargingInfrastructureSpecification, TravelTime travelTime,
 			DriveEnergyConsumption.Factory driveConsumptionFactory, AuxEnergyConsumption.Factory auxConsumptionFactory,
@@ -186,7 +186,6 @@ public final class EvNetworkRoutingModule implements RoutingModule {
 				});
 		DriveEnergyConsumption driveEnergyConsumption = pseudoVehicle.getDriveEnergyConsumption();
 		AuxEnergyConsumption auxEnergyConsumption = pseudoVehicle.getAuxEnergyConsumption();
-		double lastCharge = pseudoVehicle.getBattery().getCharge();
 		double linkEnterTime = basicLeg.getDepartureTime().seconds();
 		for (Link l : links) {
 			double travelT = travelTime.getLinkTravelTime(l, basicLeg.getDepartureTime().seconds(), null, null);

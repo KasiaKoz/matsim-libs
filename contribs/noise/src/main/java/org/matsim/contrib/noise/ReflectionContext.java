@@ -7,7 +7,7 @@ import org.locationtech.jts.geom.*;
 import org.locationtech.jts.geom.util.AffineTransformation;
 import org.matsim.core.config.Config;
 
-import javax.inject.Inject;
+import jakarta.inject.Inject;
 import java.util.*;
 
 /**
@@ -183,6 +183,12 @@ public class ReflectionContext {
     }
 
     private Coordinate getReflectionSegment(Coordinate coordinate, LineSegment segment, double length) {
+
+		if (segment.getLength() == 0) {
+			// yyyy added this here to avoid crashing feb'2023 - cr
+			logger.warn("Zero length line segment on {}", coordinate);
+			return null;
+		}
 
         final Coordinate right = segment.pointAlongOffset(0.5, length);
         LineSegment segmentRight = new LineSegment(coordinate, right);

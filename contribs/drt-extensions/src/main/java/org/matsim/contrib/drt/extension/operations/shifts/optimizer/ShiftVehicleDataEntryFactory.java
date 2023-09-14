@@ -10,18 +10,18 @@ import org.matsim.contrib.drt.run.DrtConfigGroup;
 import org.matsim.contrib.dvrp.fleet.DvrpVehicle;
 import org.matsim.core.config.Config;
 
-import javax.inject.Inject;
+import jakarta.inject.Inject;
 
 /**
  * @author nkuehnel / MOIA
  */
 public class ShiftVehicleDataEntryFactory implements VehicleEntry.EntryFactory {
 
-	private final VehicleDataEntryFactoryImpl entryFactory;
+	private final VehicleEntry.EntryFactory entryFactory;
 
 
-	public ShiftVehicleDataEntryFactory(DrtConfigGroup drtCfg) {
-		entryFactory = new VehicleDataEntryFactoryImpl(drtCfg);
+	public ShiftVehicleDataEntryFactory(VehicleEntry.EntryFactory delegate) {
+		entryFactory = delegate;
 	}
 
 	@Override
@@ -43,19 +43,5 @@ public class ShiftVehicleDataEntryFactory implements VehicleEntry.EntryFactory {
 			return false;
 		}
 		return !(dvrpVehicle.getSchedule().getCurrentTask() instanceof OperationalStop);
-	}
-
-	public static class ShiftVehicleDataEntryFactoryProvider implements Provider<ShiftVehicleDataEntryFactory> {
-
-		@Inject
-		private Config config;
-
-		public ShiftVehicleDataEntryFactoryProvider() {
-		}
-
-		@Override
-		public ShiftVehicleDataEntryFactory get() {
-			return new ShiftVehicleDataEntryFactory(DrtConfigGroup.getSingleModeDrtConfig(config));
-		}
 	}
 }

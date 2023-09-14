@@ -19,11 +19,7 @@
 
 package org.matsim.contrib.etaxi.run;
 
-import static java.util.stream.Collectors.toList;
 import static org.matsim.contrib.drt.run.DrtControlerCreator.createScenarioWithDrtRouteFactory;
-
-import java.net.URL;
-import java.util.List;
 
 import org.matsim.api.core.v01.Scenario;
 import org.matsim.contrib.dvrp.run.DvrpConfigGroup;
@@ -36,7 +32,7 @@ import org.matsim.contrib.ev.charging.ChargingLogic;
 import org.matsim.contrib.ev.charging.ChargingPower;
 import org.matsim.contrib.ev.charging.ChargingWithQueueingAndAssignmentLogic;
 import org.matsim.contrib.ev.charging.FixedSpeedCharging;
-import org.matsim.contrib.ev.discharging.AuxDischargingHandler;
+import org.matsim.contrib.ev.discharging.IdleDischargingHandler;
 import org.matsim.contrib.evrp.EvDvrpFleetQSimModule;
 import org.matsim.contrib.evrp.OperatingVehicleProvider;
 import org.matsim.contrib.ev.temperature.TemperatureService;
@@ -62,7 +58,7 @@ public class RunETaxiScenario {
 				new MultiModeTaxiConfigGroup(ETaxiConfigGroups::createWithCustomETaxiOptimizerParams),
 				new DvrpConfigGroup(), new OTFVisConfigGroup(), new EvConfigGroup());
 
-		config.controler().setOverwriteFileSetting(OverwriteFileSetting.overwriteExistingFiles);
+		config.controler().setOverwriteFileSetting(OverwriteFileSetting.deleteDirectoryIfExists);
 		createControler(config, otfvis).run();
 	}
 
@@ -84,12 +80,13 @@ public class RunETaxiScenario {
 		controler.addOverridingQSimModule(new AbstractQSimModule() {
 			@Override
 			protected void configureQSim() {
-				this.bind(AuxDischargingHandler.VehicleProvider.class).to(OperatingVehicleProvider.class);
+				this.bind(IdleDischargingHandler.VehicleProvider.class).to(OperatingVehicleProvider.class);
 			}
 		});
 
-		controler.configureQSimComponents(DvrpQSimComponents.activateModes(List.of(EvModule.EV_COMPONENT),
-				multiModeTaxiConfig.modes().collect(toList())));
+//		controler.configureQSimComponents(DvrpQSimComponents.activateModes(List.of(EvModule.EV_COMPONENT),
+//				multiModeTaxiConfig.modes().collect(toList())));
+		controler.configureQSimComponents( DvrpQSimComponents.activateModes( multiModeTaxiConfig.modes().toArray(String[]::new ) ) );
 
 		controler.addOverridingModule(new AbstractModule() {
 			@Override
