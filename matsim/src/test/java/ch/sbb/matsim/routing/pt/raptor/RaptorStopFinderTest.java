@@ -1845,16 +1845,22 @@ public class RaptorStopFinderTest {
     @Test
     public void testModeConsistencyWithVehicleTracking() {
         StopFinderFixture f0 = new StopFinderFixture(1., 1., 1., 1.);
+        // set-up PT
         // add PT line to allow return to origin
         f0.withReversedPTline("BLine", "BB", "XB", 1., 10 * 3600);
+        f0.withStopAttributes("carAccessible", "true", "B","X");
+        f0.withStopAttributes("walkAccessible", "true", "B","X");
+
+        // set-up intermodal accces/egress config
+        f0.srrConfig.setUseIntermodalAccessEgress(true);
+        // checks all options and picks one with the smallest disutility
+        f0.srrConfig.setIntermodalAccessEgressModeSelection(SwissRailRaptorConfigGroup.IntermodalAccessEgressModeSelection.CalcLeastCostModePerStop);
+        f0.withIntermodalAccessEgressParameterSet(TransportMode.walk, 600, 600, 0, "walkAccessible", "true");
+        f0.withIntermodalAccessEgressParameterSet(TransportMode.car, 600, 600, 0, "carAccessible", "true");
+
         Facility facAA = new FakeFacility(new Coord(-10, 0), Id.create("AA-ish", Link.class));
         Facility facXX = new FakeFacility(new Coord(100010, 0), Id.create("XX-ish", Link.class));
 
-        String[] accessibleStops = new String[]{"B","X"};
-        for (String stop : accessibleStops) {
-            f0.scenario.getTransitSchedule().getFacilities().get(Id.create(stop, TransitStopFacility.class)).getAttributes().putAttribute("carAccessible", "true") ;
-            f0.scenario.getTransitSchedule().getFacilities().get(Id.create(stop, TransitStopFacility.class)).getAttributes().putAttribute("walkAccessible", "true") ;
-        }
         Map<String, RoutingModule> routingModules = new HashMap<>();
         routingModules.put(
                 TransportMode.walk,
@@ -1865,26 +1871,6 @@ public class RaptorStopFinderTest {
                 new TeleportationRoutingModule(TransportMode.car, f0.scenario, 5., 1.0)
         );
 
-        f0.srrConfig.setUseIntermodalAccessEgress(true);
-        SwissRailRaptorConfigGroup.IntermodalAccessEgressParameterSet walkAccess = new SwissRailRaptorConfigGroup.IntermodalAccessEgressParameterSet();
-        walkAccess.setMode(TransportMode.walk);
-        walkAccess.setMaxRadius(600); // Includes stops B and X
-        walkAccess.setInitialSearchRadius(600);
-        walkAccess.setSearchExtensionRadius(0);
-        walkAccess.setStopFilterAttribute("walkAccessible");
-        walkAccess.setStopFilterValue("true");
-        f0.srrConfig.addIntermodalAccessEgress(walkAccess);
-        SwissRailRaptorConfigGroup.IntermodalAccessEgressParameterSet carAccess = new SwissRailRaptorConfigGroup.IntermodalAccessEgressParameterSet();
-        carAccess.setMode(TransportMode.car);
-        carAccess.setMaxRadius(600); // Includes stops B and X
-        carAccess.setInitialSearchRadius(600);
-        carAccess.setSearchExtensionRadius(0);
-        carAccess.setStopFilterAttribute("carAccessible");
-        carAccess.setStopFilterValue("true");
-        f0.srrConfig.addIntermodalAccessEgress(carAccess);
-        // checks all options and picks one with the smallest disutility
-        f0.srrConfig.setIntermodalAccessEgressModeSelection(
-                SwissRailRaptorConfigGroup.IntermodalAccessEgressModeSelection.CalcLeastCostModePerStop);
         // make car the preferred option
         f0.dummyPerson.getAttributes().putAttribute("subpopulation", "default");
         f0.scenario.getConfig().planCalcScore().getScoringParameters("default")
@@ -2131,6 +2117,31 @@ public class RaptorStopFinderTest {
             ptLine.addRoute(route);
 
             schedule.addTransitLine(ptLine);
+        }
+
+        void withStopAttributes(String attribName, Object attribValue, String... stops) {
+            for (String stop : stops) {
+                this.scenario
+                        .getTransitSchedule()
+                        .getFacilities()
+                        .get(Id.create(stop, TransitStopFacility.class))
+                        .getAttributes()
+                        .putAttribute(attribName, attribValue) ;
+            }
+        }
+
+        void withIntermodalAccessEgressParameterSet(
+                String mode, int maxRadius, int initSearchRadius, int searchExtensionRadius,
+                String stopFilterAttributeName, String stopFilterAttributeValue) {
+            SwissRailRaptorConfigGroup.IntermodalAccessEgressParameterSet modeParamSet =
+                    new SwissRailRaptorConfigGroup.IntermodalAccessEgressParameterSet();
+            modeParamSet.setMode(mode);
+            modeParamSet.setMaxRadius(maxRadius);
+            modeParamSet.setInitialSearchRadius(initSearchRadius);
+            modeParamSet.setSearchExtensionRadius(searchExtensionRadius);
+            modeParamSet.setStopFilterAttribute(stopFilterAttributeName);
+            modeParamSet.setStopFilterValue(stopFilterAttributeValue);
+            this.srrConfig.addIntermodalAccessEgress(modeParamSet);
         }
     }
 }
