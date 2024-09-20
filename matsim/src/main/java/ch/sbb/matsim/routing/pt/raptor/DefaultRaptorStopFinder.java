@@ -121,16 +121,20 @@ public class DefaultRaptorStopFinder implements RaptorStopFinder {
         switch (srrCfg.getIntermodalAccessEgressModeSelection()) {
             case CalcLeastCostModePerStop:
                 for (IntermodalAccessEgressParameterSet parameterSet : srrCfg.getIntermodalAccessEgressParameterSets()) {
-                    addInitialStopsForParamSet(fromFacility, toFacility, person, departureTime, routingAttributes, direction, parameters, data, x, y, initialStops, parameterSet);
+					if (considerParameterSet(srrCfg, parameterSet, direction, person, data)) {
+						addInitialStopsForParamSet(fromFacility, toFacility, person, departureTime, routingAttributes, direction, parameters, data, x, y, initialStops, parameterSet);
+					}
                 }
                 break;
             case RandomSelectOneModePerRoutingRequestAndDirection:
                 int counter = 0;
                 do {
                     int rndSelector = random.nextInt(srrCfg.getIntermodalAccessEgressParameterSets().size());
-                    addInitialStopsForParamSet(fromFacility, toFacility, person, departureTime, routingAttributes, direction, parameters, data, x, y,
-                            initialStops, srrCfg.getIntermodalAccessEgressParameterSets().get(rndSelector));
-                    counter++;
+					IntermodalAccessEgressParameterSet parameterSet = srrCfg.getIntermodalAccessEgressParameterSets().get(rndSelector);
+					if (considerParameterSet(srrCfg, parameterSet, direction, person, data)) {
+						addInitialStopsForParamSet(fromFacility, toFacility, person, departureTime, routingAttributes, direction, parameters, data, x, y, initialStops, parameterSet);
+						counter++;
+					}
                     // try again if no initial stop was found for the parameterset. Avoid infinite loop by limiting number of tries.
                 } while (initialStops.isEmpty() && counter < 2 * srrCfg.getIntermodalAccessEgressParameterSets().size());
                 break;
@@ -139,6 +143,33 @@ public class DefaultRaptorStopFinder implements RaptorStopFinder {
         }
         return initialStops;
     }
+
+	private boolean vehicleTrackingEnabled(SwissRailRaptorConfigGroup config, IntermodalAccessEgressParameterSet parameterSet) {
+		// todo: check config settings
+		// todo: change default to false after implementing
+		if (parameterSet.getMode().equals("car")) {
+			return true;
+		}
+		return false;
+	}
+
+	private boolean considerParameterSet(SwissRailRaptorConfigGroup config, IntermodalAccessEgressParameterSet parameterSet,
+		Direction direction, Person person, SwissRailRaptorData data) {
+		if (vehicleTrackingEnabled(config, parameterSet)) {
+			String mode = parameterSet.getMode();
+			switch (direction) {
+				case ACCESS:
+					// if vehicle has not been left somewhere and agent is trying to access a stop, assume they have
+					// access to their vehicle
+					return !data.vehicleWasLeftAtStop(person, mode);
+				case EGRESS:
+					// if vehicle has been left parked at a stop and agent is looking to egress a stop, allow them the
+					// opportunity to look for stops using that mode as intermodal egress
+					return data.vehicleWasLeftAtStop(person, mode);
+			}
+		}
+		return true;
+	}
 
     private void addInitialStopsForParamSet(Facility fromFacility, Facility toFacility, Person person, double departureTime, Attributes routingAttributes, Direction direction, RaptorParameters parameters, SwissRailRaptorData data, double x, double y, List<InitialStop> initialStops, IntermodalAccessEgressParameterSet paramset) {
         String mode = paramset.getMode();
@@ -191,7 +222,12 @@ public class DefaultRaptorStopFinder implements RaptorStopFinder {
                     RoutingModule module = this.routingModules.get(mode);
                     routeParts = module.calcRoute(DefaultRoutingRequest.of(facility, stopFacility, departureTime, person, routingAttributes));
                 } else { // it's Egress
-                    // We don't know the departure time for the egress trip, so just use the original departureTime,
+					// todo: soft-code car
+					if (mode.equals("car") && !data.vehicleWasLeftAtStop(person, mode, stop)) {
+						// the vehicle of tracked mode was not found at this stop, skip this choice
+						continue;
+					}
+					// We don't know the departure time for the egress trip, so just use the original departureTime,
                     // although it is wrong and might result in a wrong traveltime and thus wrong route.
                     RoutingModule module = this.routingModules.get(mode);
                     routeParts = module.calcRoute(DefaultRoutingRequest.of(stopFacility, facility, departureTime, person, routingAttributes));

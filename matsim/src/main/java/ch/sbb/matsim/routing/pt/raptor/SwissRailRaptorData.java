@@ -10,6 +10,7 @@ import org.matsim.api.core.v01.Id;
 import org.matsim.api.core.v01.TransportMode;
 import org.matsim.api.core.v01.network.Link;
 import org.matsim.api.core.v01.network.Network;
+import org.matsim.api.core.v01.population.Person;
 import org.matsim.core.population.routes.NetworkRoute;
 import org.matsim.core.utils.collections.QuadTree;
 import org.matsim.core.utils.geometry.CoordUtils;
@@ -58,6 +59,7 @@ public class SwissRailRaptorData {
     final QuadTree<TransitStopFacility> stopsQT;
     final Map<String, Map<String, QuadTree<TransitStopFacility>>> stopFilterAttribute2Value2StopsQT;
     final OccupancyData occupancyData;
+    Map<Id<Person>, Map<String, Id<TransitStopFacility>>> vehiclesAtStops = new HashMap<>();
 
     private SwissRailRaptorData(RaptorStaticConfig config, int countStops,
                                 RRoute[] routes, int[] departures, Vehicle[] departureVehicles, Id<Departure>[] departureIds, RRouteStop[] routeStops,
@@ -468,6 +470,28 @@ public class SwissRailRaptorData {
 
     public TransitStopFacility findNearestStop(double x, double y) {
         return this.stopsQT.getClosest(x, y);
+    }
+
+    public void parkVehicleAtStop(Person person, String mode, TransitStopFacility stop) {
+        vehiclesAtStops.putIfAbsent(person.getId(), new HashMap<>());
+        vehiclesAtStops.get(person.getId()).put(mode, stop.getId());
+    }
+
+    public void releaseVehicleFromStop(Person person, String mode) {
+        vehiclesAtStops.putIfAbsent(person.getId(), new HashMap<>());
+        vehiclesAtStops.get(person.getId()).remove(mode);
+    }
+
+    public boolean vehicleWasLeftAtStop(Person person, String mode) {
+        return vehiclesAtStops.containsKey(person.getId()) && vehiclesAtStops.get(person.getId()).containsKey(mode);
+    }
+
+    public boolean vehicleWasLeftAtStop(Person person, String mode, TransitStopFacility stop) {
+        Map<String, Id<TransitStopFacility>> personTracker = vehiclesAtStops.getOrDefault(person.getId(), null);
+        if (personTracker != null) {
+            return personTracker.getOrDefault(mode, null).equals(stop.getId());
+        }
+        return false;
     }
 
     /**

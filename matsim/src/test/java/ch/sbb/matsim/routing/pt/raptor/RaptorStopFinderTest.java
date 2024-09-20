@@ -1842,6 +1842,95 @@ public class RaptorStopFinderTest {
         }
     }
 
+    @Test
+    public void testModeConsistencyWithVehicleTracking() {
+        StopFinderFixture f0 = new StopFinderFixture(1., 1., 1., 1.);
+        // add PT line to allow return to origin
+        f0.withReversedPTline("BLine", "BB", "XB", 1., 10 * 3600);
+        Facility facAA = new FakeFacility(new Coord(-10, 0), Id.create("AA-ish", Link.class));
+        Facility facXX = new FakeFacility(new Coord(100010, 0), Id.create("XX-ish", Link.class));
+
+        String[] accessibleStops = new String[]{"B","X"};
+        for (String stop : accessibleStops) {
+            f0.scenario.getTransitSchedule().getFacilities().get(Id.create(stop, TransitStopFacility.class)).getAttributes().putAttribute("carAccessible", "true") ;
+            f0.scenario.getTransitSchedule().getFacilities().get(Id.create(stop, TransitStopFacility.class)).getAttributes().putAttribute("walkAccessible", "true") ;
+        }
+        Map<String, RoutingModule> routingModules = new HashMap<>();
+        routingModules.put(
+                TransportMode.walk,
+                new TeleportationRoutingModule(TransportMode.walk, f0.scenario, 1.5, 1.0)
+        );
+        routingModules.put(
+                TransportMode.car,
+                new TeleportationRoutingModule(TransportMode.car, f0.scenario, 5., 1.0)
+        );
+
+        f0.srrConfig.setUseIntermodalAccessEgress(true);
+        SwissRailRaptorConfigGroup.IntermodalAccessEgressParameterSet walkAccess = new SwissRailRaptorConfigGroup.IntermodalAccessEgressParameterSet();
+        walkAccess.setMode(TransportMode.walk);
+        walkAccess.setMaxRadius(600); // Includes stops B and X
+        walkAccess.setInitialSearchRadius(600);
+        walkAccess.setSearchExtensionRadius(0);
+        walkAccess.setStopFilterAttribute("walkAccessible");
+        walkAccess.setStopFilterValue("true");
+        f0.srrConfig.addIntermodalAccessEgress(walkAccess);
+        SwissRailRaptorConfigGroup.IntermodalAccessEgressParameterSet carAccess = new SwissRailRaptorConfigGroup.IntermodalAccessEgressParameterSet();
+        carAccess.setMode(TransportMode.car);
+        carAccess.setMaxRadius(600); // Includes stops B and X
+        carAccess.setInitialSearchRadius(600);
+        carAccess.setSearchExtensionRadius(0);
+        carAccess.setStopFilterAttribute("carAccessible");
+        carAccess.setStopFilterValue("true");
+        f0.srrConfig.addIntermodalAccessEgress(carAccess);
+        // checks all options and picks one with the smallest disutility
+        f0.srrConfig.setIntermodalAccessEgressModeSelection(
+                SwissRailRaptorConfigGroup.IntermodalAccessEgressModeSelection.CalcLeastCostModePerStop);
+        // make car the preferred option
+        f0.dummyPerson.getAttributes().putAttribute("subpopulation", "default");
+        f0.scenario.getConfig().planCalcScore().getScoringParameters("default")
+                .getOrCreateModeParams("walk").setMarginalUtilityOfTraveling(-10);
+        f0.scenario.getConfig().planCalcScore().getScoringParameters("default")
+                .getOrCreateModeParams("car").setMarginalUtilityOfTraveling(-1);
+
+        SwissRailRaptorData data = SwissRailRaptorData.create(f0.scenario.getTransitSchedule(), null, RaptorUtils.createStaticConfig(f0.config), f0.scenario.getNetwork(), null);
+        DefaultRaptorStopFinder stopFinder = new DefaultRaptorStopFinder(new DefaultRaptorIntermodalAccessEgress(), routingModules);
+        SwissRailRaptor raptor = new SwissRailRaptor.Builder(data, f0.scenario.getConfig()).with(stopFinder).build();
+
+        // test that you can't use a vehicle-tracked mode on both sides of a PT trip
+        List<? extends PlanElement> outboundLegs = raptor.calcRoute(DefaultRoutingRequest.withoutAttributes(facAA, facXX, 7 * 3600, f0.dummyPerson));
+        System.out.println("Outbound Trip Legs");
+        for (PlanElement leg : outboundLegs) {
+            System.out.println(leg);
+        }
+
+        Assert.assertEquals("wrong number of legs.", 3, outboundLegs.size());
+        Assert.assertEquals(TransportMode.car, ((Leg) outboundLegs.get(0)).getMode());
+        Assert.assertEquals(TransportMode.pt, ((Leg) outboundLegs.get(1)).getMode());
+        Assert.assertEquals(TransportMode.walk, ((Leg) outboundLegs.get(2)).getMode());
+
+        // test that you can take the car on the way back
+        List<? extends PlanElement> inboundLegs = raptor.calcRoute(DefaultRoutingRequest.withoutAttributes(facXX, facAA, 9 * 3600, f0.dummyPerson));
+        System.out.println("Inbound Trip Legs");
+        for (PlanElement leg : inboundLegs) {
+            System.out.println(leg);
+        }
+
+        Assert.assertEquals("wrong number of legs.", 3, inboundLegs.size());
+        Assert.assertEquals(TransportMode.walk, ((Leg) inboundLegs.get(0)).getMode());
+        Assert.assertEquals(TransportMode.pt, ((Leg) inboundLegs.get(1)).getMode());
+        Assert.assertEquals(TransportMode.car, ((Leg) inboundLegs.get(2)).getMode());
+
+        // test that you can't take the car on the way back twice in the row
+        // the vehicle has been picked up from the stop in previous trip
+        List<? extends PlanElement> inboundAgainLegs = raptor.calcRoute(DefaultRoutingRequest.withoutAttributes(facXX, facAA, 9 * 3600, f0.dummyPerson));
+        System.out.println("Inbound Again Trip Legs");
+        for (PlanElement leg : inboundAgainLegs) {
+            System.out.println(leg);
+        }
+
+        Assert.assertEquals(TransportMode.walk, ((Leg) inboundAgainLegs.get(2)).getMode());
+    }
+
     private static class StopFinderFixture {
 
         final SwissRailRaptorConfigGroup srrConfig;
@@ -2017,6 +2106,31 @@ public class RaptorStopFinderTest {
 
             this.dummyPerson = this.scenario.getPopulation().getFactory().createPerson(Id.create("dummy", Person.class));
 
+        }
+        
+        void withReversedPTline(String lineId, String stopLinkId, String reverseLinkId, double offset, int depTime) {
+            TransitSchedule schedule = this.scenario.getTransitSchedule();
+            TransitScheduleFactory sf = schedule.getFactory();
+
+            TransitLine line = this.scenario.getTransitSchedule().getTransitLines().get(Id.create(lineId, TransitLine.class));
+
+            // Reversed transit line
+            TransitLine ptLine = sf.createTransitLine(Id.create("reversed-" + lineId, TransitLine.class));
+            TransitRoute ptRoute = line.getRoutes().values().iterator().next();
+
+            NetworkRoute networkRoute = RouteUtils.createLinkNetworkRouteImpl(
+                    Id.create(stopLinkId, Link.class),
+                    new Id[]{Id.create(reverseLinkId, Link.class)},
+                    Id.create(stopLinkId, Link.class));
+            List<TransitRouteStop> stops = new ArrayList<>(2);
+            stops.add(sf.createTransitRouteStopBuilder(ptRoute.getStops().get(1).getStopFacility()).departureOffset(0.0).build());
+            stops.add(sf.createTransitRouteStopBuilder(ptRoute.getStops().get(0).getStopFacility()).arrivalOffset(offset).build());
+            TransitRoute route = sf.createTransitRoute(Id.create("rev-route-" + lineId, TransitRoute.class),
+                    networkRoute, stops, ptRoute.getTransportMode());
+            route.addDeparture(sf.createDeparture(Id.create("1", Departure.class), depTime));
+            ptLine.addRoute(route);
+
+            schedule.addTransitLine(ptLine);
         }
     }
 }

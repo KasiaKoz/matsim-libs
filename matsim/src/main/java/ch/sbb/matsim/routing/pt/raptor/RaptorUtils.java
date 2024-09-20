@@ -11,10 +11,7 @@ import java.util.Map;
 import org.matsim.api.core.v01.Id;
 import org.matsim.api.core.v01.TransportMode;
 import org.matsim.api.core.v01.network.Link;
-import org.matsim.api.core.v01.population.Activity;
-import org.matsim.api.core.v01.population.Leg;
-import org.matsim.api.core.v01.population.PlanElement;
-import org.matsim.api.core.v01.population.Route;
+import org.matsim.api.core.v01.population.*;
 import org.matsim.core.config.Config;
 import org.matsim.core.config.ConfigUtils;
 import org.matsim.core.config.groups.PlanCalcScoreConfigGroup;
@@ -159,4 +156,62 @@ public final class RaptorUtils {
 
         return legs;
     }
+
+    public static void recordLegChoices(RaptorRoute route, Person person, SwissRailRaptorData data) {
+        int i = 0;
+        for (RaptorRoute.RoutePart part : route.parts) {
+            if (part.planElements != null) {
+                for (PlanElement pe : part.planElements) {
+                    if (pe instanceof Leg) {
+                        Leg leg = (Leg) pe;
+                        // todo soft-code car
+                        if (leg.getMode().equals("car")) {
+                            RaptorRoute.RoutePart nextRoutePart = routePartAtIndex(route, i + 1);
+                            if (nextRoutePart != null && routePartIsPT(nextRoutePart)) {
+                                // if there is a next route part, and it's PT, that means a tracked mode
+                                // was used to access it, record the vehicle at the stop
+                                data.parkVehicleAtStop(person, leg.getMode(), nextRoutePart.fromStop);
+                            } else if (nextRoutePart != null) {
+                                // there may be a transfer walk connecting that mode and PT
+                                // we skip the transfer walk and look at the next route part
+                                RaptorRoute.RoutePart nextNextRoutePart = routePartAtIndex(route, i + 2);
+                                if (nextNextRoutePart != null && routePartIsPT(nextNextRoutePart)) {
+                                    data.parkVehicleAtStop(person, leg.getMode(), nextNextRoutePart.fromStop);
+                                }
+                            } else {
+                                // a tracked mode was used to egress a PT stop, release the vehicle from that stop
+                                RaptorRoute.RoutePart prevRoutePart = routePartAtIndex(route, i - 1);
+                                if (prevRoutePart != null && routePartIsPT(prevRoutePart)) {
+                                    data.releaseVehicleFromStop(person, leg.getMode());
+                                } else if (prevRoutePart != null) {
+                                    // previous route part must have been a transfer walk, try an earlier route part
+                                    RaptorRoute.RoutePart prevPrevRoutePart = routePartAtIndex(route, i - 2);
+                                    if (prevPrevRoutePart != null && routePartIsPT(prevPrevRoutePart)) {
+                                        data.releaseVehicleFromStop(person, leg.getMode());
+                                    }
+                                } else {
+                                    // the tracked vehicle mode exists in isolation, which I don't think is possible
+                                    // unless you configure walking as a tracked mode
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            i++;
+        }
+    }
+
+    private static RaptorRoute.RoutePart routePartAtIndex(RaptorRoute route, int i) {
+        if (route.parts.size() > i) {
+            return route.parts.get(i);
+        }
+        return null;
+    }
+
+    private static Boolean routePartIsPT(RaptorRoute.RoutePart routePart) {
+        return routePart.planElements == null && routePart.line != null;
+    }
+
 }

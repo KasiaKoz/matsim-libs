@@ -119,6 +119,7 @@ public class SwissRailRaptor implements TransitRouter {
         }
 
 		List<? extends PlanElement> legs = RaptorUtils.convertRouteToLegs(foundRoute, this.data.config.getTransferWalkMargin());
+        RaptorUtils.recordLegChoices(foundRoute, person, this.data);
         return legs;
     }
     
