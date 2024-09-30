@@ -11,6 +11,8 @@ import org.matsim.api.core.v01.TransportMode;
 import org.matsim.api.core.v01.network.Link;
 import org.matsim.api.core.v01.network.Network;
 import org.matsim.api.core.v01.population.Person;
+import org.matsim.core.controler.events.IterationStartsEvent;
+import org.matsim.core.controler.listener.IterationStartsListener;
 import org.matsim.core.population.routes.NetworkRoute;
 import org.matsim.core.utils.collections.QuadTree;
 import org.matsim.core.utils.geometry.CoordUtils;
@@ -41,7 +43,7 @@ import java.util.function.Supplier;
 /**
  * @author mrieser / SBB
  */
-public class SwissRailRaptorData {
+public class SwissRailRaptorData implements IterationStartsListener {
 
     private static final Logger log = Logger.getLogger(SwissRailRaptorData.class);
 
@@ -492,6 +494,11 @@ public class SwissRailRaptorData {
             return personTracker.getOrDefault(mode, null).equals(stop.getId());
         }
         return false;
+    }
+
+    @Override
+    public void notifyIterationStarts(IterationStartsEvent event) {
+        vehiclesAtStops.clear();
     }
 
     /**

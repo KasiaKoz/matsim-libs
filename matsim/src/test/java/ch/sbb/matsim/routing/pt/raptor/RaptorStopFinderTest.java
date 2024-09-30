@@ -17,6 +17,7 @@ import org.matsim.api.core.v01.population.PlanElement;
 import org.matsim.core.config.Config;
 import org.matsim.core.config.ConfigUtils;
 import org.matsim.core.config.groups.PlanCalcScoreConfigGroup;
+import org.matsim.core.controler.events.IterationStartsEvent;
 import org.matsim.core.population.routes.NetworkRoute;
 import org.matsim.core.population.routes.RouteUtils;
 import org.matsim.core.router.DefaultRoutingRequest;
@@ -1903,6 +1904,56 @@ public class RaptorStopFinderTest {
 
         Assert.assertEquals("wrong number of legs.", 3, inboundAgainLegs.size());
         Assert.assertEquals(TransportMode.walk, ((Leg) inboundAgainLegs.get(2)).getMode());
+    }
+
+    @Test
+    public void testVehicleTrackerIsResetWhenNewIterationStarts() {
+        StopFinderFixture f0 = new StopFinderFixture(1., 1., 1., 1.);
+        // set-up PT
+        // add PT line to allow return to origin
+        f0.withReversedPTline("BLine", "BB", "XB", 1., 10 * 3600);
+        f0.withStopAttributes("carAccessible", "true", "B","X");
+        f0.withStopAttributes("walkAccessible", "true", "B","X");
+
+        // set-up intermodal access/egress config
+        f0.srrConfig.setUseIntermodalAccessEgress(true);
+        // checks all options and picks one with the smallest disutility
+        f0.srrConfig.setIntermodalAccessEgressModeSelection(SwissRailRaptorConfigGroup.IntermodalAccessEgressModeSelection.CalcLeastCostModePerStop);
+        f0.withIntermodalAccessEgressParameterSet(TransportMode.walk, 600, 600, 0, "walkAccessible", "true");
+        f0.withIntermodalAccessEgressParameterSet(TransportMode.car, 600, 600, 0, "carAccessible", "true");
+
+        // make car the preferred option
+        f0.dummyPerson.getAttributes().putAttribute("subpopulation", "default");
+        f0.scenario.getConfig().planCalcScore().getScoringParameters("default")
+                .getOrCreateModeParams("walk").setMarginalUtilityOfTraveling(-10);
+        f0.scenario.getConfig().planCalcScore().getScoringParameters("default")
+                .getOrCreateModeParams("car").setMarginalUtilityOfTraveling(-1);
+
+        Map<String, RoutingModule> routingModules = new HashMap<>();
+        routingModules.put(
+                TransportMode.car,
+                new TeleportationRoutingModule(TransportMode.car, f0.scenario, 2, 1.0)
+        );
+        routingModules.put(
+                TransportMode.walk,
+                new TeleportationRoutingModule(TransportMode.walk, f0.scenario, 2, 1.0)
+        );
+        SwissRailRaptorData data = SwissRailRaptorData.create(f0.scenario.getTransitSchedule(), null,
+                RaptorUtils.createStaticConfig(f0.config), f0.scenario.getNetwork(), null);
+        DefaultRaptorStopFinder stopFinder = new DefaultRaptorStopFinder(new DefaultRaptorIntermodalAccessEgress(), routingModules);
+        SwissRailRaptor raptor = new SwissRailRaptor.Builder(data, f0.scenario.getConfig()).with(stopFinder).build();
+
+        Facility facAA = new FakeFacility(new Coord(-10, 0), Id.create("AA-ish", Link.class));
+        Facility facXX = new FakeFacility(new Coord(100010, 0), Id.create("XX-ish", Link.class));
+
+        List<? extends PlanElement> outboundLegs = raptor.calcRoute(DefaultRoutingRequest.withoutAttributes(facAA, facXX, 7 * 3600, f0.dummyPerson));
+        System.out.println(outboundLegs);
+
+        Assert.assertTrue(data.vehicleWasLeftAtStop(f0.dummyPerson, "car"));
+
+        data.notifyIterationStarts(new IterationStartsEvent(null, 1, false));
+
+        Assert.assertFalse(data.vehicleWasLeftAtStop(f0.dummyPerson, "car"));
     }
 
     private static class StopFinderFixture {
