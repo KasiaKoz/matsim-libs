@@ -1851,25 +1851,12 @@ public class RaptorStopFinderTest {
         f0.withStopAttributes("carAccessible", "true", "B","X");
         f0.withStopAttributes("walkAccessible", "true", "B","X");
 
-        // set-up intermodal accces/egress config
+        // set-up intermodal access/egress config
         f0.srrConfig.setUseIntermodalAccessEgress(true);
         // checks all options and picks one with the smallest disutility
         f0.srrConfig.setIntermodalAccessEgressModeSelection(SwissRailRaptorConfigGroup.IntermodalAccessEgressModeSelection.CalcLeastCostModePerStop);
         f0.withIntermodalAccessEgressParameterSet(TransportMode.walk, 600, 600, 0, "walkAccessible", "true");
         f0.withIntermodalAccessEgressParameterSet(TransportMode.car, 600, 600, 0, "carAccessible", "true");
-
-        Facility facAA = new FakeFacility(new Coord(-10, 0), Id.create("AA-ish", Link.class));
-        Facility facXX = new FakeFacility(new Coord(100010, 0), Id.create("XX-ish", Link.class));
-
-        Map<String, RoutingModule> routingModules = new HashMap<>();
-        routingModules.put(
-                TransportMode.walk,
-                new TeleportationRoutingModule(TransportMode.walk, f0.scenario, 1.5, 1.0)
-        );
-        routingModules.put(
-                TransportMode.car,
-                new TeleportationRoutingModule(TransportMode.car, f0.scenario, 5., 1.0)
-        );
 
         // make car the preferred option
         f0.dummyPerson.getAttributes().putAttribute("subpopulation", "default");
@@ -1878,9 +1865,9 @@ public class RaptorStopFinderTest {
         f0.scenario.getConfig().planCalcScore().getScoringParameters("default")
                 .getOrCreateModeParams("car").setMarginalUtilityOfTraveling(-1);
 
-        SwissRailRaptorData data = SwissRailRaptorData.create(f0.scenario.getTransitSchedule(), null, RaptorUtils.createStaticConfig(f0.config), f0.scenario.getNetwork(), null);
-        DefaultRaptorStopFinder stopFinder = new DefaultRaptorStopFinder(new DefaultRaptorIntermodalAccessEgress(), routingModules);
-        SwissRailRaptor raptor = new SwissRailRaptor.Builder(data, f0.scenario.getConfig()).with(stopFinder).build();
+        Facility facAA = new FakeFacility(new Coord(-10, 0), Id.create("AA-ish", Link.class));
+        Facility facXX = new FakeFacility(new Coord(100010, 0), Id.create("XX-ish", Link.class));
+        SwissRailRaptor raptor = f0.getSBBRaptorWithTeleportedAccessModes(TransportMode.walk, TransportMode.car);
 
         // test that you can't use a vehicle-tracked mode on both sides of a PT trip
         List<? extends PlanElement> outboundLegs = raptor.calcRoute(DefaultRoutingRequest.withoutAttributes(facAA, facXX, 7 * 3600, f0.dummyPerson));
@@ -1914,6 +1901,7 @@ public class RaptorStopFinderTest {
             System.out.println(leg);
         }
 
+        Assert.assertEquals("wrong number of legs.", 3, inboundAgainLegs.size());
         Assert.assertEquals(TransportMode.walk, ((Leg) inboundAgainLegs.get(2)).getMode());
     }
 
@@ -2142,6 +2130,20 @@ public class RaptorStopFinderTest {
             modeParamSet.setStopFilterAttribute(stopFilterAttributeName);
             modeParamSet.setStopFilterValue(stopFilterAttributeValue);
             this.srrConfig.addIntermodalAccessEgress(modeParamSet);
+        }
+
+        SwissRailRaptor getSBBRaptorWithTeleportedAccessModes(String... modes) {
+            Map<String, RoutingModule> routingModules = new HashMap<>();
+            for (String mode : modes) {
+                routingModules.put(
+                        mode,
+                        new TeleportationRoutingModule(mode, this.scenario, 2, 1.0)
+                );
+            }
+            SwissRailRaptorData data = SwissRailRaptorData.create(this.scenario.getTransitSchedule(), null,
+                    RaptorUtils.createStaticConfig(this.config), this.scenario.getNetwork(), null);
+            DefaultRaptorStopFinder stopFinder = new DefaultRaptorStopFinder(new DefaultRaptorIntermodalAccessEgress(), routingModules);
+            return new SwissRailRaptor.Builder(data, this.scenario.getConfig()).with(stopFinder).build();
         }
     }
 }
