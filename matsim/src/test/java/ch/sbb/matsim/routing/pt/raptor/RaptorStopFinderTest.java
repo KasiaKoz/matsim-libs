@@ -1861,10 +1861,8 @@ public class RaptorStopFinderTest {
 
         // make car the preferred option
         f0.dummyPerson.getAttributes().putAttribute("subpopulation", "default");
-        f0.scenario.getConfig().planCalcScore().getScoringParameters("default")
-                .getOrCreateModeParams("walk").setMarginalUtilityOfTraveling(-10);
-        f0.scenario.getConfig().planCalcScore().getScoringParameters("default")
-                .getOrCreateModeParams("car").setMarginalUtilityOfTraveling(-1);
+        f0.withMUTravForModeAndSubpop(-10.0, TransportMode.walk, "default");
+        f0.withMUTravForModeAndSubpop(-1.0, TransportMode.car, "default");
 
         Facility facAA = new FakeFacility(new Coord(-10, 0), Id.create("AA-ish", Link.class));
         Facility facXX = new FakeFacility(new Coord(100010, 0), Id.create("XX-ish", Link.class));
@@ -1924,35 +1922,24 @@ public class RaptorStopFinderTest {
 
         // make car the preferred option
         f0.dummyPerson.getAttributes().putAttribute("subpopulation", "default");
-        f0.scenario.getConfig().planCalcScore().getScoringParameters("default")
-                .getOrCreateModeParams("walk").setMarginalUtilityOfTraveling(-10);
-        f0.scenario.getConfig().planCalcScore().getScoringParameters("default")
-                .getOrCreateModeParams("car").setMarginalUtilityOfTraveling(-1);
+        f0.withMUTravForModeAndSubpop(-10.0, TransportMode.walk, "default");
+        f0.withMUTravForModeAndSubpop(-1.0, TransportMode.car, "default");
 
-        Map<String, RoutingModule> routingModules = new HashMap<>();
-        routingModules.put(
-                TransportMode.car,
-                new TeleportationRoutingModule(TransportMode.car, f0.scenario, 2, 1.0)
-        );
-        routingModules.put(
-                TransportMode.walk,
-                new TeleportationRoutingModule(TransportMode.walk, f0.scenario, 2, 1.0)
-        );
-        SwissRailRaptorData data = SwissRailRaptorData.create(f0.scenario.getTransitSchedule(), null,
-                RaptorUtils.createStaticConfig(f0.config), f0.scenario.getNetwork(), null);
-        DefaultRaptorStopFinder stopFinder = new DefaultRaptorStopFinder(new DefaultRaptorIntermodalAccessEgress(), routingModules);
-        SwissRailRaptor raptor = new SwissRailRaptor.Builder(data, f0.scenario.getConfig()).with(stopFinder).build();
+        SwissRailRaptorData data = f0.getSBBData();
+        SwissRailRaptor raptor = f0.getSBBRaptorWithTeleportedAccessModes(data, TransportMode.walk, TransportMode.car);
 
         Facility facAA = new FakeFacility(new Coord(-10, 0), Id.create("AA-ish", Link.class));
         Facility facXX = new FakeFacility(new Coord(100010, 0), Id.create("XX-ish", Link.class));
 
-        List<? extends PlanElement> outboundLegs = raptor.calcRoute(DefaultRoutingRequest.withoutAttributes(facAA, facXX, 7 * 3600, f0.dummyPerson));
-        System.out.println(outboundLegs);
-
+        // call on routing request which is expected to involve a car leg that leaves a car at a stop
+        List<? extends PlanElement> legs = raptor.calcRoute(DefaultRoutingRequest.withoutAttributes(facAA, facXX, 7 * 3600, f0.dummyPerson));
+        Assert.assertEquals(TransportMode.car, ((Leg) legs.get(0)).getMode());
         Assert.assertTrue(data.vehicleWasLeftAtStop(f0.dummyPerson, "car"));
 
+        // start a new iteration
         data.notifyIterationStarts(new IterationStartsEvent(null, 1, false));
 
+        // check no car left at any stop, i.e. the tracker was cleared
         Assert.assertFalse(data.vehicleWasLeftAtStop(f0.dummyPerson, "car"));
     }
 
@@ -2132,6 +2119,11 @@ public class RaptorStopFinderTest {
             this.dummyPerson = this.scenario.getPopulation().getFactory().createPerson(Id.create("dummy", Person.class));
 
         }
+
+        void withMUTravForModeAndSubpop(double marginalUtilityOfTraveling, String mode, String subpopulation) {
+            this.scenario.getConfig().planCalcScore().getScoringParameters(subpopulation)
+                    .getOrCreateModeParams(mode).setMarginalUtilityOfTraveling(marginalUtilityOfTraveling);
+        }
         
         void withReversedPTline(String lineId, String stopLinkId, String reverseLinkId, double offset, int depTime) {
             TransitSchedule schedule = this.scenario.getTransitSchedule();
@@ -2183,7 +2175,12 @@ public class RaptorStopFinderTest {
             this.srrConfig.addIntermodalAccessEgress(modeParamSet);
         }
 
-        SwissRailRaptor getSBBRaptorWithTeleportedAccessModes(String... modes) {
+        SwissRailRaptorData getSBBData() {
+            return SwissRailRaptorData.create(this.scenario.getTransitSchedule(), null,
+                    RaptorUtils.createStaticConfig(this.config), this.scenario.getNetwork(), null);
+        }
+
+        SwissRailRaptor getSBBRaptorWithTeleportedAccessModes(SwissRailRaptorData data, String... modes) {
             Map<String, RoutingModule> routingModules = new HashMap<>();
             for (String mode : modes) {
                 routingModules.put(
@@ -2191,10 +2188,13 @@ public class RaptorStopFinderTest {
                         new TeleportationRoutingModule(mode, this.scenario, 2, 1.0)
                 );
             }
-            SwissRailRaptorData data = SwissRailRaptorData.create(this.scenario.getTransitSchedule(), null,
-                    RaptorUtils.createStaticConfig(this.config), this.scenario.getNetwork(), null);
             DefaultRaptorStopFinder stopFinder = new DefaultRaptorStopFinder(new DefaultRaptorIntermodalAccessEgress(), routingModules);
             return new SwissRailRaptor.Builder(data, this.scenario.getConfig()).with(stopFinder).build();
+        }
+
+        SwissRailRaptor getSBBRaptorWithTeleportedAccessModes(String... modes) {
+            SwissRailRaptorData data = this.getSBBData();
+            return getSBBRaptorWithTeleportedAccessModes(data, modes);
         }
     }
 }
